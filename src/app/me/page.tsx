@@ -7,6 +7,7 @@ import { isLocked } from '@/lib/lock';
 import PoolActions from '@/components/pools/PoolActions';
 import RenameBracket from '@/components/me/RenameBracket';
 import SwitchPlayer from '@/components/auth/SwitchPlayer';
+import ThemeToggle from '@/components/theme/ThemeToggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,6 +82,11 @@ export default async function MePage() {
       <section className="space-y-3">
         <h2 className="font-display text-xl text-muted">Join or create a pool</h2>
         <PoolActions />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-display text-xl text-muted">Appearance</h2>
+        <ThemeToggle />
       </section>
     </div>
   );

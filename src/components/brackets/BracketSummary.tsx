@@ -56,7 +56,7 @@ export default function BracketSummary({ predictions, teams }: Props) {
                         </span>
                         {t ? (
                           <span className="truncate">
-                            {t.flag} {t.code}
+                            {t.flag} {t.name}
                           </span>
                         ) : (
                           <span className="text-muted">—</span>
@@ -83,7 +83,7 @@ export default function BracketSummary({ predictions, teams }: Props) {
                   className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-white/[0.03] px-2.5 py-1 text-xs font-semibold"
                 >
                   <span>{t?.flag}</span>
-                  {code}
+                  {t?.name ?? code}
                 </span>
               );
             })

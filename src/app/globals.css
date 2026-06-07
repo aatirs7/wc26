@@ -28,6 +28,42 @@
 
   --live: #ff5d73;
   --pitch-glow: rgba(30, 230, 164, 0.14);
+  --glow-1: rgba(30, 230, 164, 0.14);
+  --glow-2: rgba(255, 200, 80, 0.08);
+  --grain-opacity: 0.035;
+  --pitch-opacity: 0.5;
+  --glass-bg: rgba(12, 18, 32, 0.82);
+}
+
+/* Gray light theme: a calm slate, not stark white. */
+[data-theme='gray'] {
+  --bg: #b8bdc8;
+  --bg-2: #c5c9d2;
+  --surface: #ccd0d8;
+  --surface-2: #d7dae100;
+  --surface-raised: #dde0e6;
+  --line: rgba(20, 28, 45, 0.12);
+  --line-strong: rgba(20, 28, 45, 0.24);
+  --fg: #1a2030;
+  --muted: #515b6c;
+  --muted-2: #79808f;
+
+  --accent: #0c9b6b;
+  --accent-2: #0a7d57;
+  --accent-ink: #ffffff;
+
+  --gold: #b27f1f;
+  --silver: #69718440;
+  --bronze: #a9622f;
+  --slate: #7e8696;
+
+  --live: #cf3a52;
+  --pitch-glow: rgba(12, 155, 107, 0.1);
+  --glow-1: rgba(12, 155, 107, 0.1);
+  --glow-2: rgba(180, 140, 40, 0.07);
+  --grain-opacity: 0.02;
+  --pitch-opacity: 0.35;
+  --glass-bg: rgba(210, 214, 222, 0.85);
 }
 
 @theme inline {
@@ -70,8 +106,8 @@ body {
   z-index: -2;
   pointer-events: none;
   background:
-    radial-gradient(120% 60% at 50% -10%, var(--pitch-glow), transparent 60%),
-    radial-gradient(90% 50% at 100% 110%, rgba(255, 200, 80, 0.08), transparent 60%),
+    radial-gradient(120% 60% at 50% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(90% 50% at 100% 110%, var(--glow-2), transparent 60%),
     linear-gradient(180deg, var(--bg-2), var(--bg) 40%);
 }
 
@@ -81,7 +117,7 @@ body {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.5;
+  opacity: var(--pitch-opacity);
   background-image:
     linear-gradient(var(--line) 1px, transparent 1px);
   background-size: 100% 88px;
@@ -94,7 +130,7 @@ body {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.035;
+  opacity: var(--grain-opacity);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -117,7 +153,7 @@ body {
   border-radius: 1.1rem;
 }
 .glass {
-  background: rgba(12, 18, 32, 0.82);
+  background: var(--glass-bg);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   border: 1px solid var(--line);

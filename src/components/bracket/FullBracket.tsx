@@ -39,22 +39,24 @@ function Slot({
       type="button"
       disabled={!onTap || !code}
       onClick={onTap}
-      className={`flex h-9 w-full items-center gap-1.5 px-2 text-left transition-colors ${
+      className={`flex h-10 w-full items-center gap-2 px-2.5 text-left transition-colors ${
         isWinner ? 'bg-accent/[0.12]' : ''
       } ${dim ? 'opacity-40' : ''} disabled:cursor-default`}
     >
-      <span className="text-sm leading-none">{team?.flag ?? ''}</span>
+      <span className="text-base leading-none">{team?.flag ?? ''}</span>
       <span className="min-w-0 flex-1">
         {team ? (
-          <span className="block truncate text-xs font-bold leading-none">{team.code}</span>
+          <span className={`block truncate text-[0.8rem] font-bold leading-tight ${isWinner ? 'text-accent' : ''}`}>
+            {team.name}
+          </span>
         ) : (
-          <span className="block truncate text-[0.65rem] font-medium leading-none text-muted-2">
+          <span className="block truncate text-[0.7rem] font-medium leading-tight text-muted-2">
             {label}
           </span>
         )}
       </span>
       {isWinner ? (
-        <ChevronRight className="h-3 w-3 shrink-0 text-accent" strokeWidth={3} />
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={3} />
       ) : null}
     </button>
   );
@@ -71,7 +73,7 @@ function Tie({
 }) {
   const decided = m.winner != null;
   return (
-    <div className="w-32 shrink-0 overflow-hidden rounded-lg border border-edge bg-surface">
+    <div className="w-44 shrink-0 overflow-hidden rounded-lg border border-edge bg-surface">
       <Slot
         code={m.aCode}
         label={m.aLabel}
@@ -136,18 +138,21 @@ export default function FullBracket({ predictions, teamsByCode, onPick }: Props)
         <Node id={ROOT_ID} />
         <Connector />
         <div
-          className={`flex w-32 shrink-0 flex-col items-center gap-1 rounded-lg border p-2.5 text-center ${
+          className={`flex w-40 shrink-0 flex-col items-center gap-1 rounded-lg border p-3 text-center ${
             champ ? 'border-gold/50 bg-gold/[0.08] ring-1' : 'border-edge bg-surface'
           }`}
         >
-          <Trophy className={`h-5 w-5 ${champ ? 'text-gold' : 'text-muted-2'}`} strokeWidth={2} />
+          <Trophy className={`h-6 w-6 ${champ ? 'text-gold' : 'text-muted-2'}`} strokeWidth={2} />
           {champ ? (
             <>
-              <span className="text-lg leading-none">{champ.flag}</span>
-              <span className="text-xs font-bold leading-none">{champ.code}</span>
+              <span className="text-2xl leading-none">{champ.flag}</span>
+              <span className="text-sm font-bold leading-tight">{champ.name}</span>
+              <span className="text-[0.55rem] font-bold uppercase tracking-wider text-gold">
+                Champion
+              </span>
             </>
           ) : (
-            <span className="text-[0.6rem] font-medium leading-tight text-muted-2">Champion</span>
+            <span className="text-[0.65rem] font-medium leading-tight text-muted-2">Champion</span>
           )}
         </div>
       </div>

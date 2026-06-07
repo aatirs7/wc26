@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Bebas_Neue, Hanken_Grotesk } from 'next/font/google';
+import { cookies } from 'next/headers';
 import BottomTabBar from '@/components/nav/BottomTabBar';
 import './globals.css';
 
@@ -26,14 +27,16 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const theme = (await cookies()).get('wc26_theme')?.value === 'gray' ? 'gray' : 'dark';
   return (
     <html
       lang="en"
+      data-theme={theme}
       className={`${display.variable} ${body.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col pb-tabbar">
