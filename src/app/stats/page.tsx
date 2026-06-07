@@ -89,6 +89,10 @@ export default async function StatsPage() {
   const accuracyOf = (points: number) =>
     attainable > 0 ? Math.round((points / attainable) * 100) : null;
 
+  const myName = members.find((m) => m.clerkId === userId)?.name ?? null;
+  const myCohort = myName ? cohortOf(myName) : null;
+  const myFamily = myName ? familyOf(myName) : null;
+
   const rows = members.map((m) => {
     const b = byOwner.get(m.clerkId);
     return {
@@ -155,8 +159,15 @@ export default async function StatsPage() {
 
       <div className="grid grid-cols-2 gap-3">
         {cohorts.map(({ c, s, accent, members: cohortMembers }) => (
-          <div key={c} className="card space-y-3 p-4">
-            <h2 className={`font-display text-2xl leading-none ${accent}`}>{s.label}</h2>
+          <div key={c} className={`card space-y-3 p-4 ${c === myCohort ? 'border-accent' : ''}`}>
+            <h2 className={`flex items-center gap-1.5 font-display text-2xl leading-none ${accent}`}>
+              {s.label}
+              {c === myCohort ? (
+                <span className="rounded-full bg-accent px-1.5 py-0.5 text-[0.5rem] font-bold uppercase tracking-wider text-[var(--accent-ink)]">
+                  You
+                </span>
+              ) : null}
+            </h2>
             <div className="flex items-end gap-4">
               <div>
                 <div className="font-display text-4xl leading-none">{s.avgPoints}</div>
@@ -195,7 +206,7 @@ export default async function StatsPage() {
                 </dd>
               </div>
             </dl>
-            <MemberList members={cohortMembers} />
+            <MemberList members={cohortMembers} highlight={myName ?? undefined} />
           </div>
         ))}
       </div>
@@ -207,11 +218,18 @@ export default async function StatsPage() {
         </p>
         <ol className="space-y-2">
           {families.map((f, i) => (
-            <li key={f.name} className="card p-3">
+            <li key={f.name} className={`card p-3 ${f.name === myFamily ? 'border-accent' : ''}`}>
               <div className="flex items-center gap-3">
                 <span className="w-5 text-center font-display text-lg text-muted">{i + 1}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-display text-lg leading-tight">{f.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate font-display text-lg leading-tight">{f.name}</span>
+                    {f.name === myFamily ? (
+                      <span className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[0.5rem] font-bold uppercase tracking-wider text-[var(--accent-ink)]">
+                        You
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="text-xs text-muted">{f.count} players · {f.totalPoints} pts</div>
                 </div>
                 <div className="text-right">
@@ -224,7 +242,7 @@ export default async function StatsPage() {
                 </div>
               </div>
               <div className="mt-2 border-t border-edge/50 pt-1">
-                <MemberList members={f.members} />
+                <MemberList members={f.members} highlight={myName ?? undefined} />
               </div>
             </li>
           ))}
@@ -236,9 +254,19 @@ export default async function StatsPage() {
         {anyPoints ? (
           <ol className="space-y-2">
             {topOverall.map((r, i) => (
-              <li key={r.name} className="card flex items-center gap-3 px-3 py-2.5">
+              <li
+                key={r.name}
+                className={`card flex items-center gap-3 px-3 py-2.5 ${
+                  r.name === myName ? 'border-accent bg-accent/[0.06]' : ''
+                }`}
+              >
                 <span className="w-5 text-center font-display text-lg text-muted">{i + 1}</span>
-                <span className="flex-1 truncate text-sm font-bold">{r.name}</span>
+                <span className="flex-1 truncate text-sm font-bold">
+                  {r.name}
+                  {r.name === myName ? (
+                    <span className="ml-1.5 text-[0.6rem] font-bold uppercase text-accent">You</span>
+                  ) : null}
+                </span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wider ${
                     r.cohort === 'adults' ? 'bg-gold/15 text-gold' : 'bg-accent/15 text-accent'
