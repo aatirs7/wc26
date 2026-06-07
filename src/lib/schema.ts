@@ -1,0 +1,113 @@
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import type { Predictions } from '@/types/bracket';
+
+export const users = pgTable('users', {
+  clerkId: text('clerk_id').primaryKey(),
+  displayName: text('display_name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const pools = pgTable('pools', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  ownerClerkId: text('owner_clerk_id').notNull(),
+  joinCode: text('join_code').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const poolMembers = pgTable(
+  'pool_members',
+  {
+    poolId: uuid('pool_id').notNull(),
+    clerkId: text('clerk_id').notNull(),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.poolId, t.clerkId] })],
+);
+
+export const teams = pgTable('teams', {
+  code: text('code').primaryKey(), // FIFA 3-letter code
+  name: text('name').notNull(),
+  groupLetter: text('group_letter').notNull(),
+  flag: text('flag').notNull(), // emoji
+});
+
+export const matches = pgTable('matches', {
+  // 1-72 group matches in source file order, 73-102 openfootball num,
+  // 103 third-place playoff, 104 final
+  id: integer('id').primaryKey(),
+  stage: text('stage').notNull(), // group|r32|r16|qf|sf|third|final
+  groupLetter: text('group_letter'),
+  homeCode: text('home_code'),
+  awayCode: text('away_code'),
+  // raw slot strings like '2A', '3A/B/C/D/F', 'W73' until teams are known
+  homePlaceholder: text('home_placeholder'),
+  awayPlaceholder: text('away_placeholder'),
+  homeScore: integer('home_score'),
+  awayScore: integer('away_score'),
+  status: text('status').notNull().default('scheduled'), // scheduled|live|ht|ft|et|pens
+  winnerCode: text('winner_code'),
+  kickoffUtc: timestamp('kickoff_utc', { withTimezone: true }).notNull(),
+  roundLabel: text('round_label').notNull(),
+  providerFixtureId: integer('provider_fixture_id'),
+});
+
+export const groupStandings = pgTable(
+  'group_standings',
+  {
+    groupLetter: text('group_letter').notNull(),
+    teamCode: text('team_code').notNull(),
+    played: integer('played').notNull().default(0),
+    points: integer('points').notNull().default(0),
+    gd: integer('gd').notNull().default(0),
+    gf: integer('gf').notNull().default(0),
+    rank: integer('rank'),
+    advanced: boolean('advanced').notNull().default(false),
+    isBestThird: boolean('is_best_third').notNull().default(false),
+  },
+  (t) => [primaryKey({ columns: [t.groupLetter, t.teamCode] })],
+);
+
+export const brackets = pgTable(
+  'brackets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerClerkId: text('owner_clerk_id').notNull(),
+    poolId: uuid('pool_id').notNull(),
+    name: text('name').notNull(),
+    predictions: jsonb('predictions').$type<Predictions>().notNull(),
+    totalPoints: integer('total_points').notNull().default(0),
+    lockedAt: timestamp('locked_at', { withTimezone: true }),
+    submitted: boolean('submitted').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex('brackets_owner_pool_unique').on(t.ownerClerkId, t.poolId)],
+);
+
+export const bracketScores = pgTable(
+  'bracket_scores',
+  {
+    bracketId: uuid('bracket_id').notNull(),
+    roundKey: text('round_key').notNull(),
+    points: integer('points').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.bracketId, t.roundKey] })],
+);
+
+// Tiny key-value row for sync bookkeeping (last full sync time, etc).
+export const syncMeta = pgTable('sync_meta', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
