@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { brackets } from '@/lib/schema';
+import { bracketScores, brackets } from '@/lib/schema';
 import { isPoolMember } from '@/lib/access';
 import { currentUserId } from '@/lib/auth';
 import { isLocked } from '@/lib/lock';
@@ -123,4 +123,25 @@ export async function PATCH(req: Request) {
     .where(eq(brackets.id, bracket.id))
     .returning();
   return NextResponse.json({ bracket: updated });
+}
+
+const deleteSchema = z.object({ id: z.string().uuid() });
+
+// Delete a bracket entirely (owner only, before lock). Lets a player
+// start over from scratch.
+export async function DELETE(req: Request) {
+  const userId = await currentUserId();
+  if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  const parsed = deleteSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: 'invalid body' }, { status: 400 });
+
+  if (isLocked()) return NextResponse.json({ error: 'locked' }, { status: 403 });
+
+  const bracket = await loadOwned(parsed.data.id, userId);
+  if (!bracket) return NextResponse.json({ error: 'not found' }, { status: 404 });
+
+  await db.delete(bracketScores).where(eq(bracketScores.bracketId, bracket.id));
+  await db.delete(brackets).where(eq(brackets.id, bracket.id));
+  return NextResponse.json({ ok: true });
 }

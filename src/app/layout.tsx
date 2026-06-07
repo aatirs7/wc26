@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Bebas_Neue, Hanken_Grotesk } from 'next/font/google';
 import { cookies } from 'next/headers';
 import BottomTabBar from '@/components/nav/BottomTabBar';
+import ThemeButton from '@/components/theme/ThemeButton';
 import './globals.css';
 
 const display = Bebas_Neue({
@@ -32,7 +33,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const theme = (await cookies()).get('wc26_theme')?.value === 'gray' ? 'gray' : 'dark';
+  // Gray (day) is the default; only an explicit cookie switches to night.
+  const theme = (await cookies()).get('wc26_theme')?.value === 'dark' ? 'dark' : 'gray';
   return (
     <html
       lang="en"
@@ -43,7 +45,8 @@ export default async function RootLayout({
         <div className="bg-atmosphere" aria-hidden />
         <div className="bg-pitch" aria-hidden />
         <div className="bg-grain" aria-hidden />
-        <main className="mx-auto w-full max-w-md flex-1 px-4">{children}</main>
+        <ThemeButton initial={theme} />
+        <main className="mx-auto w-full max-w-md flex-1 px-4 pt-14">{children}</main>
         <BottomTabBar />
       </body>
     </html>

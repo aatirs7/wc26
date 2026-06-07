@@ -33,7 +33,7 @@ export default async function LandingPage() {
           </p>
           <p className="text-sm leading-relaxed text-muted">
             Rank every group, call the knockouts, and chase the family all the
-            way to MetLife on July 19. May the best Siddiqui win.
+            way to the Final on July 19. May the best Siddiqui win.
           </p>
         </div>
       </div>
