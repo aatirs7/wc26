@@ -53,7 +53,7 @@ export default async function MatchesPage({
     <div className="space-y-4 py-4">
       <LivePoller active={anyLive || anySoon} />
 
-      <header className="flex items-center justify-between pt-2">
+      <header className="flex flex-col items-center gap-3 pt-2">
         <h1 className="font-display text-4xl leading-none">Matches</h1>
         <div className="flex rounded-full border border-edge bg-white/[0.03] p-1 text-xs font-bold">
           <Link

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import Link from 'next/link';
 import type { Team } from '@/types/team';
 import type { Predictions } from '@/types/bracket';
 import {
@@ -135,10 +136,13 @@ export default function BracketBuilder({ bracket, teams }: Props) {
     <div className="pb-28">
       <StickyProgressBar steps={stepInfos} activeKey={step} onSelect={(k) => setStep(k as StepKey)} />
 
-      <div className="mt-3 mb-3 flex items-center justify-between gap-2">
+      <div className="mt-3 mb-1 flex items-center justify-between gap-2">
         <h2 className="font-display text-3xl leading-none">{STEP_HEADINGS[step]}</h2>
         <ClearStepButton key={step} onClear={() => dispatch({ type: 'clearStep', step })} />
       </div>
+      <Link href="/scoring" className="mb-3 inline-block text-xs font-semibold text-accent underline">
+        How it&apos;s scored
+      </Link>
 
       {submitted ? (
         <p className="mb-3 rounded-xl border border-accent/40 bg-accent/[0.08] p-3 text-sm text-accent">

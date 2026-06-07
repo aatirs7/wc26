@@ -1,9 +1,12 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { brackets, poolMembers, users } from '@/lib/schema';
+import { brackets, groupStandings, matches, poolMembers, users } from '@/lib/schema';
 import { currentUserId } from '@/lib/auth';
-import { cohortOf, type Cohort } from '@/lib/cohorts';
+import { cohortOf, familyOf, FAMILIES, type Cohort } from '@/lib/cohorts';
+import { attainablePoints, buildFacts } from '@/lib/scoring';
+import MemberList, { type Member } from '@/components/stats/MemberList';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +16,7 @@ interface CohortStats {
   submitted: number;
   totalPoints: number;
   avgPoints: number;
+  accuracy: number | null;
   leaderName: string | null;
   leaderPoints: number;
 }
@@ -20,6 +24,7 @@ interface CohortStats {
 function summarize(
   label: string,
   rows: { name: string; points: number; submitted: boolean }[],
+  attainable: number,
 ): CohortStats {
   const totalPoints = rows.reduce((s, r) => s + r.points, 0);
   const submitted = rows.filter((r) => r.submitted).length;
@@ -30,6 +35,10 @@ function summarize(
     submitted,
     totalPoints,
     avgPoints: rows.length ? Math.round((totalPoints / rows.length) * 10) / 10 : 0,
+    accuracy:
+      attainable > 0 && rows.length
+        ? Math.round((totalPoints / (attainable * rows.length)) * 100)
+        : null,
     leaderName: leader?.name ?? null,
     leaderPoints: leader?.points ?? 0,
   };
@@ -58,22 +67,51 @@ export default async function StatsPage() {
   const poolBrackets = await db.select().from(brackets).where(eq(brackets.poolId, poolId));
   const byOwner = new Map(poolBrackets.map((b) => [b.ownerId, b]));
 
+  // Accuracy denominator: max points a perfect bracket could hold so far.
+  const matchRows = await db
+    .select({
+      stage: matches.stage,
+      status: matches.status,
+      groupLetter: matches.groupLetter,
+      winnerCode: matches.winnerCode,
+    })
+    .from(matches);
+  const standingRows = await db
+    .select({
+      groupLetter: groupStandings.groupLetter,
+      teamCode: groupStandings.teamCode,
+      rank: groupStandings.rank,
+      isBestThird: groupStandings.isBestThird,
+    })
+    .from(groupStandings);
+  const facts = buildFacts(matchRows, standingRows);
+  const attainable = attainablePoints(matchRows, facts);
+  const accuracyOf = (points: number) =>
+    attainable > 0 ? Math.round((points / attainable) * 100) : null;
+
   const rows = members.map((m) => {
     const b = byOwner.get(m.clerkId);
     return {
       name: m.name,
       cohort: cohortOf(m.name),
+      family: familyOf(m.name),
       points: b?.totalPoints ?? 0,
       submitted: b?.submitted ?? false,
     };
   });
 
-  const adults = summarize('Adults', rows.filter((r) => r.cohort === 'adults'));
-  const kids = summarize('Kids', rows.filter((r) => r.cohort === 'kids'));
+  const toMember = (r: { name: string; points: number }): Member => ({
+    name: r.name,
+    points: r.points,
+    accuracy: accuracyOf(r.points),
+  });
 
-  const cohorts: { c: Cohort; s: CohortStats; accent: string }[] = [
-    { c: 'adults', s: adults, accent: 'text-gold' },
-    { c: 'kids', s: kids, accent: 'text-accent' },
+  const adults = summarize('Adults', rows.filter((r) => r.cohort === 'adults'), attainable);
+  const kids = summarize('Kids', rows.filter((r) => r.cohort === 'kids'), attainable);
+
+  const cohorts: { c: Cohort; s: CohortStats; accent: string; members: Member[] }[] = [
+    { c: 'adults', s: adults, accent: 'text-gold', members: rows.filter((r) => r.cohort === 'adults').map(toMember) },
+    { c: 'kids', s: kids, accent: 'text-accent', members: rows.filter((r) => r.cohort === 'kids').map(toMember) },
   ];
 
   // Who is ahead, by average points per player (fairer than total since
@@ -82,14 +120,30 @@ export default async function StatsPage() {
   if (adults.avgPoints > kids.avgPoints) banner = 'Adults are ahead';
   else if (kids.avgPoints > adults.avgPoints) banner = 'Kids are ahead';
 
+  // Families: ranked by accuracy (fair across different household sizes).
+  const families = FAMILIES.map((f) => {
+    const fam = rows.filter((r) => r.family === f.name);
+    const totalPoints = fam.reduce((s, r) => s + r.points, 0);
+    const accuracy =
+      attainable > 0 && fam.length
+        ? Math.round((totalPoints / (attainable * fam.length)) * 100)
+        : null;
+    return { name: f.name, count: fam.length, totalPoints, accuracy, members: fam.map(toMember) };
+  }).sort((a, b) => (b.accuracy ?? -1) - (a.accuracy ?? -1) || b.totalPoints - a.totalPoints);
+
   const topOverall = rows.slice().sort((a, b) => b.points - a.points).slice(0, 5);
   const anyPoints = rows.some((r) => r.points > 0);
 
   return (
     <div className="space-y-5 py-4">
-      <header className="pt-2">
+      <header className="pt-2 text-center">
         <h1 className="font-display text-4xl leading-none">Adults vs Kids</h1>
-        <p className="mt-1 text-sm text-muted">Family bragging rights.</p>
+        <p className="mt-1 text-sm text-muted">
+          Family bragging rights ·{' '}
+          <Link href="/scoring" className="font-semibold text-accent underline">
+            How it&apos;s scored
+          </Link>
+        </p>
       </header>
 
       <div className="card p-4 text-center">
@@ -100,13 +154,23 @@ export default async function StatsPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {cohorts.map(({ c, s, accent }) => (
+        {cohorts.map(({ c, s, accent, members: cohortMembers }) => (
           <div key={c} className="card space-y-3 p-4">
             <h2 className={`font-display text-2xl leading-none ${accent}`}>{s.label}</h2>
-            <div>
-              <div className="font-display text-4xl leading-none">{s.avgPoints}</div>
-              <div className="text-[0.65rem] font-bold uppercase tracking-wider text-muted">
-                avg points
+            <div className="flex items-end gap-4">
+              <div>
+                <div className="font-display text-4xl leading-none">{s.avgPoints}</div>
+                <div className="text-[0.65rem] font-bold uppercase tracking-wider text-muted">
+                  avg pts
+                </div>
+              </div>
+              <div>
+                <div className="font-display text-4xl leading-none">
+                  {s.accuracy === null ? '—' : `${s.accuracy}%`}
+                </div>
+                <div className="text-[0.65rem] font-bold uppercase tracking-wider text-muted">
+                  accuracy
+                </div>
               </div>
             </div>
             <dl className="space-y-1 text-xs text-muted">
@@ -131,9 +195,41 @@ export default async function StatsPage() {
                 </dd>
               </div>
             </dl>
+            <MemberList members={cohortMembers} />
           </div>
         ))}
       </div>
+
+      <section>
+        <h2 className="mb-2 text-center font-display text-2xl">Family vs Family</h2>
+        <p className="mb-3 text-center text-xs text-muted">
+          Ranked by accuracy, so household size doesn&apos;t matter.
+        </p>
+        <ol className="space-y-2">
+          {families.map((f, i) => (
+            <li key={f.name} className="card p-3">
+              <div className="flex items-center gap-3">
+                <span className="w-5 text-center font-display text-lg text-muted">{i + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-display text-lg leading-tight">{f.name}</div>
+                  <div className="text-xs text-muted">{f.count} players · {f.totalPoints} pts</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-display text-2xl leading-none text-accent">
+                    {f.accuracy === null ? '—' : `${f.accuracy}%`}
+                  </div>
+                  <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted">
+                    accuracy
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2 border-t border-edge/50 pt-1">
+                <MemberList members={f.members} />
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
 
       <section>
         <h3 className="mb-2 font-display text-xl text-muted">Top of the family</h3>
@@ -150,6 +246,9 @@ export default async function StatsPage() {
                 >
                   {r.cohort}
                 </span>
+                {accuracyOf(r.points) !== null ? (
+                  <span className="text-xs font-semibold text-muted">{accuracyOf(r.points)}%</span>
+                ) : null}
                 <span className="font-display text-xl text-accent">{r.points}</span>
               </li>
             ))}

@@ -103,11 +103,8 @@ export default async function LeaderboardPage({
 
   return (
     <div className="space-y-4 py-4">
-      <header className="flex items-end justify-between pt-2">
+      <header className="pt-2 text-center">
         <h1 className="font-display text-4xl leading-none">Standings</h1>
-        <span className="rounded-full bg-white/[0.04] px-3 py-1.5 text-xs text-muted">
-          Code <span className="font-mono font-bold text-accent">{active.joinCode}</span>
-        </span>
       </header>
 
       {memberships.length > 1 ? (

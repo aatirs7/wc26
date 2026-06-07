@@ -13,6 +13,7 @@ import {
   ROUND_KEYS,
   SCORING,
   SCORING_BY_ROUND,
+  THIRD_PLACE_PICKS,
   type KnockoutRoundKey,
   type RoundKey,
 } from './constants';
@@ -126,6 +127,26 @@ export function scoreBracket(p: Predictions, facts: Facts): Record<RoundKey, num
 
 export function totalOf(scores: Record<RoundKey, number>): number {
   return ROUND_KEYS.reduce((sum, k) => sum + scores[k], 0);
+}
+
+// Maximum points a perfect bracket could have banked given how far the
+// tournament has actually progressed. Used as the accuracy denominator.
+export function attainablePoints(matchRows: MatchFact[], facts: Facts): number {
+  const finalsInStage = (stage: string) =>
+    matchRows.filter((m) => m.stage === stage && isFinal(m.status)).length;
+
+  let total = 0;
+  // Each decided group: at best both top-2 picks correct.
+  total += facts.decidedGroups.size * (SCORING.groupTop2 * 2);
+  // Best-thirds only resolve once every group is in.
+  if (facts.allGroupsDecided) total += SCORING.thirdPlace * THIRD_PLACE_PICKS;
+  // Each completed knockout match yields one advancer worth the round weight.
+  total += finalsInStage('r32') * SCORING.reachR16;
+  total += finalsInStage('r16') * SCORING.reachQF;
+  total += finalsInStage('qf') * SCORING.reachSF;
+  total += finalsInStage('sf') * SCORING.reachFinal;
+  total += finalsInStage('final') * SCORING.champion;
+  return total;
 }
 
 // Recomputes and replaces every bracket's scores. Idempotent.
