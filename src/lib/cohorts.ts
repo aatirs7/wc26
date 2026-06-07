@@ -3,7 +3,7 @@
 
 export const ADULT_NAMES = [
   'Adeel', 'Wajiha', 'Adnan', 'Madiha', 'Afif', 'Farheen', 'Arees', 'Nida',
-  'Aazim', 'Daadi',
+  'Aazim', 'Daadi', 'Aarij', 'Urisha',
 ];
 
 const ADULT_SET = new Set(ADULT_NAMES.map((n) => n.toLowerCase()));

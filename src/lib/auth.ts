@@ -8,6 +8,7 @@ import { db } from './db';
 import { poolMembers, users } from './schema';
 
 export const AUTH_COOKIE = 'wc26_uid';
+export const LAST_NAME_COOKIE = 'wc26_lastname';
 export const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // one year
 
 // Returns the signed-in user's id, or null. Verifies the cookie points

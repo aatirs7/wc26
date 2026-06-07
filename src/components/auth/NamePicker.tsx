@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 
 interface Props {
   players: { id: string; displayName: string }[];
+  lastName?: string | null;
 }
 
-export default function NamePicker({ players }: Props) {
+export default function NamePicker({ players, lastName }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,27 +39,37 @@ export default function NamePicker({ players }: Props) {
     );
   }
 
+  const isLast = (name: string) => !!lastName && name.toLowerCase() === lastName.toLowerCase();
+  // Remembered name floats to the front.
+  const ordered = [...players].sort((a, b) => Number(isLast(b.displayName)) - Number(isLast(a.displayName)));
+
   return (
     <div className="space-y-2">
       <p className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-muted">
         Tap your name to play
       </p>
+      {lastName ? (
+        <p className="text-xs text-accent">Last time you were {lastName}</p>
+      ) : null}
       <div className="flex flex-wrap justify-center gap-2">
-        {players.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            disabled={busy !== null}
-            onClick={() => signIn(p)}
-            className={`min-h-11 rounded-full border px-4 text-sm font-semibold active:scale-95 disabled:opacity-40 ${
-              busy === p.id
-                ? 'border-accent bg-accent/15 text-accent'
-                : 'border-edge bg-white/[0.03]'
-            }`}
-          >
-            {p.displayName}
-          </button>
-        ))}
+        {ordered.map((p) => {
+          const mine = isLast(p.displayName);
+          return (
+            <button
+              key={p.id}
+              type="button"
+              disabled={busy !== null}
+              onClick={() => signIn(p)}
+              className={`min-h-11 rounded-full border px-4 text-sm font-semibold active:scale-95 disabled:opacity-40 ${
+                busy === p.id || mine
+                  ? 'border-accent bg-accent/15 text-accent shadow-[0_0_16px_var(--pitch-glow)]'
+                  : 'border-edge bg-white/[0.03]'
+              }`}
+            >
+              {p.displayName}
+            </button>
+          );
+        })}
       </div>
       {error ? <p className="text-sm text-live">{error}</p> : null}
     </div>

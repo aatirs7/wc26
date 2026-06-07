@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { Trophy, Lock, Timer } from 'lucide-react';
-import { currentUserId, listPlayers } from '@/lib/auth';
+import { currentUserId, listPlayers, LAST_NAME_COOKIE } from '@/lib/auth';
 import { isLocked, kickoffUtc } from '@/lib/lock';
 import NamePicker from '@/components/auth/NamePicker';
 
@@ -11,6 +12,7 @@ export default async function LandingPage() {
   const locked = isLocked();
   const kickoff = kickoffUtc();
   const players = userId ? [] : await listPlayers();
+  const lastName = userId ? null : (await cookies()).get(LAST_NAME_COOKIE)?.value ?? null;
 
   return (
     <div className="flex min-h-[88vh] flex-col items-center justify-center gap-8 py-12 text-center">
@@ -52,7 +54,7 @@ export default async function LandingPage() {
 
       <div className="reveal w-full max-w-xs" style={{ animationDelay: '160ms' }}>
         {!userId ? (
-          <NamePicker players={players} />
+          <NamePicker players={players} lastName={lastName} />
         ) : (
           <Link
             href="/bracket"

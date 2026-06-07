@@ -160,7 +160,7 @@ export default async function StatsPage() {
       <div className="grid grid-cols-2 gap-3">
         {cohorts.map(({ c, s, accent, members: cohortMembers }) => (
           <div key={c} className={`card space-y-3 p-4 ${c === myCohort ? 'border-accent' : ''}`}>
-            <h2 className={`flex items-center gap-1.5 font-display text-2xl leading-none ${accent}`}>
+            <h2 className={`flex items-center justify-center gap-1.5 font-display text-2xl leading-none ${accent}`}>
               {s.label}
               {c === myCohort ? (
                 <span className="rounded-full bg-accent px-1.5 py-0.5 text-[0.5rem] font-bold uppercase tracking-wider text-[var(--accent-ink)]">
@@ -250,7 +250,7 @@ export default async function StatsPage() {
       </section>
 
       <section>
-        <h3 className="mb-2 font-display text-xl text-muted">Top of the family</h3>
+        <h3 className="mb-2 text-center font-display text-xl text-muted">Top of the family</h3>
         {anyPoints ? (
           <ol className="space-y-2">
             {topOverall.map((r, i) => (

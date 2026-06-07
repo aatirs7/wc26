@@ -32,6 +32,11 @@ export default function GroupPicker({ teams, predictions, onRank }: Props) {
           if (pick?.fourth === code) return 4;
           return undefined;
         };
+        // Ranked teams float to the top in finishing order; the rest keep
+        // their original order below.
+        const orderedTeams = [...groupTeams].sort(
+          (a, b) => (rankOf(a.code) ?? 99) - (rankOf(b.code) ?? 99),
+        );
         return (
           <section
             key={letter}
@@ -51,7 +56,7 @@ export default function GroupPicker({ teams, predictions, onRank }: Props) {
               </span>
             </header>
             <div className="space-y-2">
-              {groupTeams.map((team) => (
+              {orderedTeams.map((team) => (
                 <TeamChip
                   key={team.code}
                   team={team}

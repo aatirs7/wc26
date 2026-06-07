@@ -1,6 +1,7 @@
 'use client';
 
 import type { Team } from '@/types/team';
+import { fifaRank } from '@/lib/fifa-rank';
 
 type Rank = 1 | 2 | 3 | 4;
 
@@ -17,6 +18,7 @@ const RANK_LABEL: Record<Rank, string> = { 1: '1', 2: '2', 3: '3', 4: '4' };
 
 export default function TeamChip({ team, rank, badge, selected, disabled, onTap }: Props) {
   const active = selected || !!rank || !!badge;
+  const fr = fifaRank(team.code);
   return (
     <button
       type="button"
@@ -37,6 +39,7 @@ export default function TeamChip({ team, rank, badge, selected, disabled, onTap 
         </span>
         <span className="font-mono text-[0.7rem] uppercase tracking-widest text-muted">
           {team.code}
+          {fr ? <span className="ml-1.5 normal-case tracking-normal text-muted-2">FIFA #{fr}</span> : null}
         </span>
       </span>
       {rank ? (
