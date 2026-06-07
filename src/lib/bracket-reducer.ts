@@ -21,7 +21,8 @@ export type BracketAction =
   | { type: 'toggleThird'; code: string }
   | { type: 'toggleRoundPick'; round: KnockoutRoundKey; code: string }
   | { type: 'toggleChampion'; code: string }
-  | { type: 'pickWinner'; fills: FillKey; winner: string; loser: string | null };
+  | { type: 'pickWinner'; fills: FillKey; winner: string; loser: string | null }
+  | { type: 'clearStep'; step: 'groups' | 'thirds' | 'knockout' };
 
 export function poolForRound(p: Predictions, round: KnockoutRoundKey): Set<string> {
   const idx = KNOCKOUT_ROUNDS.indexOf(round);
@@ -121,6 +122,20 @@ export function bracketReducer(state: Predictions, action: BracketAction): Predi
         ...state,
         knockout: { ...state.knockout, [fills]: next },
       });
+    }
+
+    case 'clearStep': {
+      // Wipe just the current step's picks. pruneDownstream cascades the
+      // clear to anything that depended on it.
+      const empty = { r16: [], qf: [], sf: [], final: [], champion: undefined };
+      switch (action.step) {
+        case 'groups':
+          return pruneDownstream({ ...state, groups: {} });
+        case 'thirds':
+          return pruneDownstream({ ...state, thirdPlace: [] });
+        case 'knockout':
+          return { ...state, knockout: empty };
+      }
     }
   }
 }

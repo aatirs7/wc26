@@ -11,7 +11,7 @@ const NAMES = [
   'Aashir', 'Aatir', 'Abeer', 'Ammaar', 'Aakif', 'Aarij', 'Alyaan', 'Urisha',
   'Aali', 'Alena', 'Aleza', 'Aafi', 'Rayyan', 'Mustafa', 'Manahil', 'Rameen',
   'Muniza', 'Adeel', 'Afif', 'Arees', 'Adnan', 'Aazim', 'Wajiha', 'Madiha',
-  'Farheen', 'Nida', 'Ayra',
+  'Farheen', 'Nida', 'Ayra', 'Daadi',
 ];
 
 async function main() {

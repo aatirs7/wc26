@@ -15,6 +15,7 @@ import ThirdPlacePicker from './ThirdPlacePicker';
 import FullBracket from './FullBracket';
 import StickyProgressBar, { type StepInfo } from './StickyProgressBar';
 import SaveSubmitBar, { type SaveStatus } from './SaveSubmitBar';
+import ClearStepButton from './ClearStepButton';
 
 interface BracketDto {
   id: string;
@@ -134,11 +135,9 @@ export default function BracketBuilder({ bracket, teams }: Props) {
     <div className="pb-28">
       <StickyProgressBar steps={stepInfos} activeKey={step} onSelect={(k) => setStep(k as StepKey)} />
 
-      <div className="mt-3 mb-3 flex items-baseline justify-between">
+      <div className="mt-3 mb-3 flex items-center justify-between gap-2">
         <h2 className="font-display text-3xl leading-none">{STEP_HEADINGS[step]}</h2>
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-          Step {stepIndex + 1}/{STEP_ORDER.length}
-        </span>
+        <ClearStepButton key={step} onClear={() => dispatch({ type: 'clearStep', step })} />
       </div>
 
       {submitted ? (
