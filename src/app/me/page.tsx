@@ -1,37 +1,37 @@
 import { redirect } from 'next/navigation';
-import { UserButton } from '@clerk/nextjs';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { brackets, poolMembers, pools, users } from '@/lib/schema';
-import { ensureUser } from '@/lib/clerk-user';
+import { currentUserId } from '@/lib/auth';
 import { isLocked } from '@/lib/lock';
 import PoolActions from '@/components/pools/PoolActions';
 import RenameBracket from '@/components/me/RenameBracket';
+import SwitchPlayer from '@/components/auth/SwitchPlayer';
 
 export const dynamic = 'force-dynamic';
 
 export default async function MePage() {
-  const userId = await ensureUser();
+  const userId = await currentUserId();
   if (!userId) redirect('/');
 
   const [me] = await db
     .select({ displayName: users.displayName })
     .from(users)
-    .where(eq(users.clerkId, userId))
+    .where(eq(users.id, userId))
     .limit(1);
 
   const myPools = await db
     .select({ poolId: pools.id, name: pools.name, joinCode: pools.joinCode })
     .from(poolMembers)
     .innerJoin(pools, eq(pools.id, poolMembers.poolId))
-    .where(eq(poolMembers.clerkId, userId));
+    .where(eq(poolMembers.userId, userId));
 
   const myBrackets = await Promise.all(
     myPools.map(async (p) => {
       const [b] = await db
         .select({ id: brackets.id, name: brackets.name, submitted: brackets.submitted })
         .from(brackets)
-        .where(and(eq(brackets.ownerClerkId, userId), eq(brackets.poolId, p.poolId)))
+        .where(and(eq(brackets.ownerId, userId), eq(brackets.poolId, p.poolId)))
         .limit(1);
       return { pool: p, bracket: b ?? null };
     }),
@@ -46,7 +46,7 @@ export default async function MePage() {
             {isLocked() ? 'Tournament running' : 'Brackets editable until kickoff'}
           </p>
         </div>
-        <UserButton />
+        <SwitchPlayer />
       </header>
 
       <section className="space-y-3">

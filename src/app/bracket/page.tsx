@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { brackets, poolMembers, pools, teams } from '@/lib/schema';
-import { ensureUser } from '@/lib/clerk-user';
+import { currentUserId } from '@/lib/auth';
 import { isLocked } from '@/lib/lock';
 import BracketBuilder from '@/components/bracket/BracketBuilder';
 import BracketSummary from '@/components/brackets/BracketSummary';
@@ -17,14 +17,14 @@ export default async function BracketPage({
 }: {
   searchParams: Promise<{ pool?: string }>;
 }) {
-  const userId = await ensureUser();
+  const userId = await currentUserId();
   if (!userId) redirect('/');
 
   const memberships = await db
     .select({ poolId: poolMembers.poolId, poolName: pools.name })
     .from(poolMembers)
     .innerJoin(pools, eq(pools.id, poolMembers.poolId))
-    .where(eq(poolMembers.clerkId, userId));
+    .where(eq(poolMembers.userId, userId));
 
   if (memberships.length === 0) {
     return (
@@ -44,7 +44,7 @@ export default async function BracketPage({
   const [bracket] = await db
     .select()
     .from(brackets)
-    .where(and(eq(brackets.ownerClerkId, userId), eq(brackets.poolId, activePoolId)))
+    .where(and(eq(brackets.ownerId, userId), eq(brackets.poolId, activePoolId)))
     .limit(1);
 
   const allTeams = await db

@@ -7,7 +7,7 @@ CREATE TABLE "bracket_scores" (
 --> statement-breakpoint
 CREATE TABLE "brackets" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"owner_clerk_id" text NOT NULL,
+	"owner_id" uuid NOT NULL,
 	"pool_id" uuid NOT NULL,
 	"name" text NOT NULL,
 	"predictions" jsonb NOT NULL,
@@ -50,15 +50,15 @@ CREATE TABLE "matches" (
 --> statement-breakpoint
 CREATE TABLE "pool_members" (
 	"pool_id" uuid NOT NULL,
-	"clerk_id" text NOT NULL,
+	"user_id" uuid NOT NULL,
 	"joined_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "pool_members_pool_id_clerk_id_pk" PRIMARY KEY("pool_id","clerk_id")
+	CONSTRAINT "pool_members_pool_id_user_id_pk" PRIMARY KEY("pool_id","user_id")
 );
 --> statement-breakpoint
 CREATE TABLE "pools" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
-	"owner_clerk_id" text NOT NULL,
+	"owner_id" uuid,
 	"join_code" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "pools_join_code_unique" UNIQUE("join_code")
@@ -78,9 +78,10 @@ CREATE TABLE "teams" (
 );
 --> statement-breakpoint
 CREATE TABLE "users" (
-	"clerk_id" text PRIMARY KEY NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"display_name" text NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "users_display_name_unique" UNIQUE("display_name")
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX "brackets_owner_pool_unique" ON "brackets" USING btree ("owner_clerk_id","pool_id");
+CREATE UNIQUE INDEX "brackets_owner_pool_unique" ON "brackets" USING btree ("owner_id","pool_id");

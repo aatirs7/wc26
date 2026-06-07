@@ -1,13 +1,17 @@
 // Pulls provider results into Neon and rescores all brackets.
 // Idempotent end to end: upserts only, and scoring replaces rows.
+// Provider budget (football-data.org free: 10 req/min, no daily cap):
+// matches every tick, standings at most every 30 minutes or right after
+// a match finishes.
 
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from './db';
 import { groupStandings, matches, syncMeta } from './schema';
-import { apiFootballProvider, type ProviderFixture } from './scores-provider';
-import { resolveTeamCode } from './team-map';
+import { footballDataProvider, type ProviderFixture } from './scores-provider';
+import { resolveProviderTeam } from './team-map';
 import { deriveAdvancement } from './standings';
 import { rescoreAll } from './scoring';
+import { FINAL_STATUSES } from './constants';
 
 export interface SyncReport {
   dry: boolean;
@@ -18,31 +22,20 @@ export interface SyncReport {
   notes: string[];
 }
 
-// Provider round labels -> our match stage. Order matters: check the
-// specific labels before the bare "final" catch-all.
-function stageFromRound(round: string | null): string | null {
-  if (!round) return null;
-  const r = round.toLowerCase();
-  if (r.includes('group')) return 'group';
-  if (r.includes('32')) return 'r32';
-  if (r.includes('16')) return 'r16';
-  if (r.includes('quarter')) return 'qf';
-  if (r.includes('semi')) return 'sf';
-  if (r.includes('3rd') || r.includes('third')) return 'third';
-  if (r.includes('final')) return 'final';
-  return null;
-}
+const STANDINGS_FLOOR_MS = 30 * 60 * 1000;
 
 type MatchRow = typeof matches.$inferSelect;
 
+const isFinal = (status: string) => (FINAL_STATUSES as readonly string[]).includes(status);
+
 // Finds our row for a provider fixture: by stored provider id first,
-// then by team codes, then by stage + closest kickoff.
+// then by team codes, then by provider stage + closest kickoff.
 function findOurMatch(f: ProviderFixture, ours: MatchRow[], notes: string[]): MatchRow | null {
   const byProvider = ours.find((m) => m.providerFixtureId === f.providerId);
   if (byProvider) return byProvider;
 
-  const home = resolveTeamCode(f.homeName);
-  const away = resolveTeamCode(f.awayName);
+  const home = resolveProviderTeam(f.homeTla, f.homeName);
+  const away = resolveProviderTeam(f.awayTla, f.awayName);
   if (home && away) {
     const byCodes = ours.find(
       (m) =>
@@ -52,42 +45,64 @@ function findOurMatch(f: ProviderFixture, ours: MatchRow[], notes: string[]): Ma
     if (byCodes) return byCodes;
   } else {
     for (const [name, code] of [[f.homeName, home], [f.awayName, away]] as const) {
-      if (!code) notes.push(`Unresolved team name from provider: ${name}`);
+      // Knockout placeholders have no real names yet; only flag real ones.
+      if (!code && name && !/^winner|^loser|^group/i.test(name)) {
+        notes.push(`Unresolved team name from provider: ${name}`);
+      }
     }
   }
 
-  const stage = stageFromRound(f.round);
-  if (!stage) {
-    notes.push(`Unmapped provider round: ${f.round} (fixture ${f.providerId})`);
+  if (!f.stage) {
+    notes.push(`Unmapped provider stage for fixture ${f.providerId}`);
     return null;
   }
   const candidates = ours
-    .filter((m) => m.stage === stage && m.providerFixtureId === null)
+    .filter((m) => m.stage === f.stage && m.providerFixtureId === null)
     .map((m) => ({ m, diff: Math.abs(m.kickoffUtc.getTime() - f.kickoffUtc.getTime()) }))
     .filter((c) => c.diff < 36 * 3600 * 1000)
     .sort((a, b) => a.diff - b.diff);
   return candidates[0]?.m ?? null;
 }
 
+async function setMeta(key: string, value: string) {
+  await db
+    .insert(syncMeta)
+    .values({ key, value, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: syncMeta.key, set: { value, updatedAt: new Date() } });
+}
+
+async function getMetaMs(key: string): Promise<number> {
+  const [row] = await db.select().from(syncMeta).where(eq(syncMeta.key, key)).limit(1);
+  return row ? Number(row.value) : 0;
+}
+
 export async function runSync(opts: { dry?: boolean } = {}): Promise<SyncReport> {
   const dry = opts.dry ?? false;
   const notes: string[] = [];
-  const provider = apiFootballProvider;
+  const provider = footballDataProvider;
 
-  const [fixtures, standings] = await Promise.all([
-    provider.fetchFixtures(),
-    provider.fetchStandings().catch((e) => {
-      // Standings can lag fixtures early in the tournament.
-      notes.push(`standings fetch failed: ${e instanceof Error ? e.message : e}`);
-      return [];
-    }),
-  ]);
-
-  let matchesUpdated = 0;
-  let standingsUpdated = 0;
+  const fixtures = await provider.fetchFixtures();
 
   if (dry) {
+    const standings = await provider
+      .fetchStandings()
+      .catch((e) => {
+        notes.push(`standings fetch failed: ${e instanceof Error ? e.message : e}`);
+        return [];
+      });
+    const unresolved = new Set<string>();
+    for (const f of fixtures) {
+      for (const [tla, name] of [
+        [f.homeTla, f.homeName],
+        [f.awayTla, f.awayName],
+      ] as const) {
+        if (name && !/^winner|^loser|^group/i.test(name) && !resolveProviderTeam(tla, name)) {
+          unresolved.add(`${name} (${tla ?? 'no tla'})`);
+        }
+      }
+    }
     notes.push(
+      `unresolved provider teams: ${unresolved.size ? [...unresolved].join(', ') : 'none'}`,
       `dry run sample fixture: ${JSON.stringify(fixtures[0] ?? null)}`,
       `dry run sample standing: ${JSON.stringify(standings[0] ?? null)}`,
     );
@@ -102,15 +117,22 @@ export async function runSync(opts: { dry?: boolean } = {}): Promise<SyncReport>
   }
 
   const ours = await db.select().from(matches);
+  let matchesUpdated = 0;
+  let anyFinishedNow = false;
+
   for (const f of fixtures) {
     const target = findOurMatch(f, ours, notes);
     if (!target) {
       notes.push(`No local match for provider fixture ${f.providerId} (${f.homeName} vs ${f.awayName})`);
       continue;
     }
-    const homeCode = target.homeCode ?? resolveTeamCode(f.homeName);
-    const awayCode = target.awayCode ?? resolveTeamCode(f.awayName);
-    const winnerCode = f.winnerName ? resolveTeamCode(f.winnerName) : null;
+    const homeCode = target.homeCode ?? resolveProviderTeam(f.homeTla, f.homeName);
+    const awayCode = target.awayCode ?? resolveProviderTeam(f.awayTla, f.awayName);
+    const winnerCode = f.winnerTla || f.winnerName
+      ? resolveProviderTeam(f.winnerTla, f.winnerName ?? '')
+      : null;
+
+    if (!isFinal(target.status) && isFinal(f.status)) anyFinishedNow = true;
 
     await db
       .update(matches)
@@ -130,64 +152,74 @@ export async function runSync(opts: { dry?: boolean } = {}): Promise<SyncReport>
     matchesUpdated += 1;
   }
 
-  for (const s of standings) {
-    const teamCode = resolveTeamCode(s.teamName);
-    const groupLetter = s.groupName.replace(/^Group\s+/i, '').trim().toUpperCase();
-    if (!teamCode || groupLetter.length !== 1) {
-      notes.push(`Unresolved standing row: ${s.groupName} / ${s.teamName}`);
-      continue;
-    }
-    await db
-      .insert(groupStandings)
-      .values({
-        groupLetter,
-        teamCode,
-        played: s.played,
-        points: s.points,
-        gd: s.gd,
-        gf: s.gf,
-        rank: s.rank,
-      })
-      .onConflictDoUpdate({
-        target: [groupStandings.groupLetter, groupStandings.teamCode],
-        set: { played: s.played, points: s.points, gd: s.gd, gf: s.gf, rank: s.rank },
-      });
-    standingsUpdated += 1;
-  }
+  // Standings change only when matches end, so fetch them sparingly.
+  let standingsFetched = 0;
+  let standingsUpdated = 0;
+  const standingsDue =
+    anyFinishedNow || Date.now() - (await getMetaMs('lastStandingsSync')) > STANDINGS_FLOOR_MS;
 
-  // Advancement flags from the freshest standings.
-  const allStandings = await db.select().from(groupStandings);
-  const { advanced, bestThirds } = deriveAdvancement(allStandings);
-  for (const row of allStandings) {
-    const adv = advanced.has(row.teamCode);
-    const third = bestThirds.has(row.teamCode);
-    if (row.advanced !== adv || row.isBestThird !== third) {
+  if (standingsDue) {
+    const standings = await provider.fetchStandings().catch((e) => {
+      notes.push(`standings fetch failed: ${e instanceof Error ? e.message : e}`);
+      return [];
+    });
+    standingsFetched = standings.length;
+
+    for (const s of standings) {
+      const teamCode = resolveProviderTeam(s.teamTla, s.teamName);
+      const groupLetter = s.groupName.replace(/^GROUP[_\s]+/i, '').trim().toUpperCase();
+      if (!teamCode || groupLetter.length !== 1) {
+        notes.push(`Unresolved standing row: ${s.groupName} / ${s.teamName}`);
+        continue;
+      }
       await db
-        .update(groupStandings)
-        .set({ advanced: adv, isBestThird: third })
-        .where(
-          and(
-            eq(groupStandings.groupLetter, row.groupLetter),
-            eq(groupStandings.teamCode, row.teamCode),
-          ),
-        );
+        .insert(groupStandings)
+        .values({
+          groupLetter,
+          teamCode,
+          played: s.played,
+          points: s.points,
+          gd: s.gd,
+          gf: s.gf,
+          rank: s.rank,
+        })
+        .onConflictDoUpdate({
+          target: [groupStandings.groupLetter, groupStandings.teamCode],
+          set: { played: s.played, points: s.points, gd: s.gd, gf: s.gf, rank: s.rank },
+        });
+      standingsUpdated += 1;
+    }
+
+    if (standings.length > 0) {
+      // Advancement flags from the freshest standings.
+      const allStandings = await db.select().from(groupStandings);
+      const { advanced, bestThirds } = deriveAdvancement(allStandings);
+      for (const row of allStandings) {
+        const adv = advanced.has(row.teamCode);
+        const third = bestThirds.has(row.teamCode);
+        if (row.advanced !== adv || row.isBestThird !== third) {
+          await db
+            .update(groupStandings)
+            .set({ advanced: adv, isBestThird: third })
+            .where(
+              and(
+                eq(groupStandings.groupLetter, row.groupLetter),
+                eq(groupStandings.teamCode, row.teamCode),
+              ),
+            );
+        }
+      }
+      await setMeta('lastStandingsSync', String(Date.now()));
     }
   }
 
   await rescoreAll();
-
-  await db
-    .insert(syncMeta)
-    .values({ key: 'lastFullSync', value: String(Date.now()), updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: syncMeta.key,
-      set: { value: String(Date.now()), updatedAt: new Date() },
-    });
+  await setMeta('lastFullSync', String(Date.now()));
 
   return {
     dry,
     fixturesFetched: fixtures.length,
-    standingsFetched: standings.length,
+    standingsFetched,
     matchesUpdated,
     standingsUpdated,
     notes,
@@ -207,6 +239,5 @@ export async function inLiveWindow(): Promise<boolean> {
 }
 
 export async function lastFullSyncMs(): Promise<number> {
-  const [row] = await db.select().from(syncMeta).where(eq(syncMeta.key, 'lastFullSync')).limit(1);
-  return row ? Number(row.value) : 0;
+  return getMetaMs('lastFullSync');
 }

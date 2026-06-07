@@ -116,3 +116,14 @@ const NORMALIZED_MAP = new Map<string, string>([
 export function resolveTeamCode(providerName: string): string | null {
   return NORMALIZED_MAP.get(normalize(providerName)) ?? null;
 }
+
+export const TEAM_CODES = codes;
+
+// Crosswalk for provider teams: trust a tla that byte-matches one of our
+// canonical codes, otherwise fall back to name matching. Returns null if
+// neither resolves, so mismatches surface in sync notes instead of
+// silently missing scoring keys.
+export function resolveProviderTeam(tla: string | null, name: string): string | null {
+  if (tla && codes.has(tla)) return tla;
+  return resolveTeamCode(name) ?? (tla ? resolveTeamCode(tla) : null);
+}

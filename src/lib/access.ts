@@ -3,11 +3,11 @@ import { db } from './db';
 import { brackets, poolMembers } from './schema';
 import { isLocked } from './lock';
 
-export async function isPoolMember(clerkId: string, poolId: string): Promise<boolean> {
+export async function isPoolMember(userId: string, poolId: string): Promise<boolean> {
   const row = await db
-    .select({ clerkId: poolMembers.clerkId })
+    .select({ userId: poolMembers.userId })
     .from(poolMembers)
-    .where(and(eq(poolMembers.poolId, poolId), eq(poolMembers.clerkId, clerkId)))
+    .where(and(eq(poolMembers.poolId, poolId), eq(poolMembers.userId, userId)))
     .limit(1);
   return row.length > 0;
 }
@@ -21,14 +21,14 @@ export interface BracketAccess {
 // including before lock (owner decision 2026-06-06, overrides the
 // original pre-lock privacy rule). Non-members get nothing.
 export async function bracketAccess(
-  viewerClerkId: string | null,
-  bracket: { ownerClerkId: string; poolId: string },
+  viewerId: string | null,
+  bracket: { ownerId: string; poolId: string },
 ): Promise<BracketAccess> {
-  if (!viewerClerkId) return { canView: false, canEdit: false };
-  if (viewerClerkId === bracket.ownerClerkId) {
+  if (!viewerId) return { canView: false, canEdit: false };
+  if (viewerId === bracket.ownerId) {
     return { canView: true, canEdit: !isLocked() };
   }
-  const member = await isPoolMember(viewerClerkId, bracket.poolId);
+  const member = await isPoolMember(viewerId, bracket.poolId);
   return { canView: member, canEdit: false };
 }
 

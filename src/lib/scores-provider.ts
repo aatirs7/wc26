@@ -1,23 +1,28 @@
-// Results provider abstraction. API-Football today; swap the
-// implementation (Sportmonks, SportsDataIO) without touching sync logic.
-// Server-side only: the free tier is ~100 requests/day, so nothing here
-// may ever run from the client.
+// Results provider abstraction. football-data.org today (free, no daily
+// cap, 10 req/min); the contract stays generic so switching providers is
+// a config flip, not a refactor. Server-side only: never call this from
+// the client.
 
 export interface ProviderFixture {
   providerId: number;
-  round: string | null;
+  stage: string | null; // our stage codes: group|r32|r16|qf|sf|third|final
+  groupLetter: string | null;
   homeName: string;
   awayName: string;
+  homeTla: string | null;
+  awayTla: string | null;
   homeScore: number | null;
   awayScore: number | null;
   status: string; // normalized: scheduled|live|ht|ft|et|pens
   kickoffUtc: Date;
   winnerName: string | null;
+  winnerTla: string | null;
 }
 
 export interface ProviderStanding {
-  groupName: string; // e.g. "Group A"
+  groupName: string; // e.g. "GROUP_A"
   teamName: string;
+  teamTla: string | null;
   played: number;
   points: number;
   gd: number;
@@ -30,89 +35,118 @@ export interface ScoresProvider {
   fetchStandings(): Promise<ProviderStanding[]>;
 }
 
-const BASE = 'https://v3.football.api-sports.io';
-const LEAGUE = 1; // FIFA World Cup
-const SEASON = 2026;
+const BASE = 'https://api.football-data.org/v4';
+const COMPETITION = 'WC';
 
-// API-Football short status codes -> our normalized statuses.
-const STATUS_MAP: Record<string, string> = {
-  TBD: 'scheduled',
-  NS: 'scheduled',
-  PST: 'scheduled',
-  CANC: 'scheduled',
-  ABD: 'scheduled',
-  '1H': 'live',
-  '2H': 'live',
-  ET: 'live',
-  BT: 'live',
-  P: 'live',
-  SUSP: 'live',
-  INT: 'live',
-  LIVE: 'live',
-  HT: 'ht',
-  FT: 'ft',
-  AET: 'et',
-  PEN: 'pens',
+// Explicit stage map. The 2026 format adds LAST_32; never assume the
+// pre-2026 stage list.
+const STAGE_MAP: Record<string, string> = {
+  GROUP_STAGE: 'group',
+  LAST_32: 'r32',
+  LAST_16: 'r16',
+  QUARTER_FINALS: 'qf',
+  SEMI_FINALS: 'sf',
+  THIRD_PLACE: 'third',
+  FINAL: 'final',
 };
 
-async function apiGet(path: string): Promise<unknown[]> {
-  const key = process.env.API_FOOTBALL_KEY;
-  if (!key) throw new Error('API_FOOTBALL_KEY is not set');
+function mapStatus(status: string, duration: string | null): string {
+  switch (status) {
+    case 'SCHEDULED':
+    case 'TIMED':
+    case 'SUSPENDED':
+    case 'POSTPONED':
+      return 'scheduled';
+    case 'IN_PLAY':
+      return 'live';
+    case 'PAUSED':
+      return 'ht';
+    case 'FINISHED':
+    case 'CANCELLED':
+    case 'AWARDED':
+      if (duration === 'PENALTY_SHOOTOUT') return 'pens';
+      if (duration === 'EXTRA_TIME') return 'et';
+      return 'ft';
+    default:
+      return 'scheduled';
+  }
+}
+
+async function apiGet(path: string): Promise<Record<string, unknown>> {
+  const token = process.env.FOOTBALL_DATA_TOKEN;
+  if (!token) throw new Error('FOOTBALL_DATA_TOKEN is not set');
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'x-apisports-key': key },
+    headers: { 'X-Auth-Token': token },
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(`API-Football ${path} failed: ${res.status}`);
-  const data = (await res.json()) as { errors?: unknown; response?: unknown[] };
-  if (data.errors && Object.keys(data.errors).length > 0) {
-    throw new Error(`API-Football ${path} errors: ${JSON.stringify(data.errors)}`);
+  if (res.status === 429) {
+    throw new Error('football-data.org rate limited (429); retry in ~60s');
   }
-  return data.response ?? [];
+  if (!res.ok) throw new Error(`football-data.org ${path} failed: ${res.status}`);
+  return (await res.json()) as Record<string, unknown>;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export const apiFootballProvider: ScoresProvider = {
+
+// Winner with knockout safety: trust penalties over score.winner when a
+// shootout happened (winner can read DRAW while penalties decide it).
+function winnerSide(raw: any): 'home' | 'away' | null {
+  if (raw.status !== 'FINISHED') return null;
+  const pens = raw.score?.penalties;
+  if (raw.score?.duration === 'PENALTY_SHOOTOUT' || (pens && pens.home !== pens.away)) {
+    if (pens && pens.home !== null && pens.away !== null) {
+      return pens.home > pens.away ? 'home' : 'away';
+    }
+  }
+  if (raw.score?.winner === 'HOME_TEAM') return 'home';
+  if (raw.score?.winner === 'AWAY_TEAM') return 'away';
+  return null;
+}
+
+export const footballDataProvider: ScoresProvider = {
   async fetchFixtures() {
-    const response = await apiGet(`/fixtures?league=${LEAGUE}&season=${SEASON}`);
-    return response.map((raw: any): ProviderFixture => {
-      const winner =
-        raw.teams?.home?.winner === true
-          ? raw.teams.home.name
-          : raw.teams?.away?.winner === true
-            ? raw.teams.away.name
-            : null;
+    const data = await apiGet(`/competitions/${COMPETITION}/matches`);
+    const matches = (data.matches as any[]) ?? [];
+    return matches.map((raw): ProviderFixture => {
+      const side = winnerSide(raw);
+      const winner = side ? raw.teams?.[side] ?? raw[`${side}Team`] : null;
       return {
-        providerId: raw.fixture.id,
-        round: raw.league?.round ?? null,
-        homeName: raw.teams.home.name,
-        awayName: raw.teams.away.name,
-        homeScore: raw.goals?.home ?? null,
-        awayScore: raw.goals?.away ?? null,
-        status: STATUS_MAP[raw.fixture?.status?.short as string] ?? 'scheduled',
-        kickoffUtc: new Date(raw.fixture.date),
-        winnerName: winner,
+        providerId: raw.id,
+        stage: STAGE_MAP[raw.stage as string] ?? null,
+        groupLetter: raw.group ? String(raw.group).replace(/^GROUP_/, '') : null,
+        homeName: raw.homeTeam?.name ?? '',
+        awayName: raw.awayTeam?.name ?? '',
+        homeTla: raw.homeTeam?.tla ?? null,
+        awayTla: raw.awayTeam?.tla ?? null,
+        homeScore: raw.score?.fullTime?.home ?? null,
+        awayScore: raw.score?.fullTime?.away ?? null,
+        status: mapStatus(raw.status, raw.score?.duration ?? null),
+        kickoffUtc: new Date(raw.utcDate),
+        winnerName: side ? (raw[`${side}Team`]?.name ?? winner?.name ?? null) : null,
+        winnerTla: side ? (raw[`${side}Team`]?.tla ?? winner?.tla ?? null) : null,
       };
     });
   },
 
   async fetchStandings() {
-    const response = await apiGet(`/standings?league=${LEAGUE}&season=${SEASON}`);
+    const data = await apiGet(`/competitions/${COMPETITION}/standings`);
+    const blocks = (data.standings as any[]) ?? [];
     const out: ProviderStanding[] = [];
-    for (const raw of response as any[]) {
-      // World Cup standings come back as one array per group.
-      const groups: any[][] = raw.league?.standings ?? [];
-      for (const group of groups) {
-        for (const row of group) {
-          out.push({
-            groupName: row.group ?? '',
-            teamName: row.team?.name ?? '',
-            played: row.all?.played ?? 0,
-            points: row.points ?? 0,
-            gd: row.goalsDiff ?? 0,
-            gf: row.all?.goals?.for ?? 0,
-            rank: row.rank ?? 0,
-          });
-        }
+    for (const block of blocks) {
+      // Tournament standings come back one block per group; ignore
+      // non-total tables if the API ever includes them.
+      if (block.type && block.type !== 'TOTAL') continue;
+      for (const row of block.table ?? []) {
+        out.push({
+          groupName: block.group ?? '',
+          teamName: row.team?.name ?? '',
+          teamTla: row.team?.tla ?? null,
+          played: row.playedGames ?? 0,
+          points: row.points ?? 0,
+          gd: row.goalDifference ?? 0,
+          gf: row.goalsFor ?? 0,
+          rank: row.position ?? 0,
+        });
       }
     }
     return out;

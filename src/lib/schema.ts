@@ -11,16 +11,18 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { Predictions } from '@/types/bracket';
 
+// Family-scale identity: a user is just a display name plus a generated
+// id kept in a long-lived cookie. No passwords.
 export const users = pgTable('users', {
-  clerkId: text('clerk_id').primaryKey(),
-  displayName: text('display_name').notNull(),
+  id: uuid('id').primaryKey().defaultRandom(),
+  displayName: text('display_name').notNull().unique(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const pools = pgTable('pools', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
-  ownerClerkId: text('owner_clerk_id').notNull(),
+  ownerId: uuid('owner_id'), // null for the system-created default pool
   joinCode: text('join_code').notNull().unique(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -29,10 +31,10 @@ export const poolMembers = pgTable(
   'pool_members',
   {
     poolId: uuid('pool_id').notNull(),
-    clerkId: text('clerk_id').notNull(),
+    userId: uuid('user_id').notNull(),
     joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [primaryKey({ columns: [t.poolId, t.clerkId] })],
+  (t) => [primaryKey({ columns: [t.poolId, t.userId] })],
 );
 
 export const teams = pgTable('teams', {
@@ -82,7 +84,7 @@ export const brackets = pgTable(
   'brackets',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    ownerClerkId: text('owner_clerk_id').notNull(),
+    ownerId: uuid('owner_id').notNull(),
     poolId: uuid('pool_id').notNull(),
     name: text('name').notNull(),
     predictions: jsonb('predictions').$type<Predictions>().notNull(),
@@ -92,7 +94,7 @@ export const brackets = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [uniqueIndex('brackets_owner_pool_unique').on(t.ownerClerkId, t.poolId)],
+  (t) => [uniqueIndex('brackets_owner_pool_unique').on(t.ownerId, t.poolId)],
 );
 
 export const bracketScores = pgTable(

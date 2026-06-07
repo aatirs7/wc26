@@ -150,7 +150,7 @@ async function main() {
   if (existingPools.length === 0) {
     const [created] = await db
       .insert(pools)
-      .values({ name: 'World Cup 2026', ownerClerkId: 'system', joinCode: 'WC2026' })
+      .values({ name: 'World Cup 2026', joinCode: 'WC2026' })
       .returning({ id: pools.id });
     console.log(`Created default pool. NEXT_PUBLIC_DEFAULT_POOL_ID=${created.id}`);
   } else {

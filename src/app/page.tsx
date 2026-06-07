@@ -1,14 +1,15 @@
 import Link from 'next/link';
-import { SignInButton } from '@clerk/nextjs';
-import { ensureUser } from '@/lib/clerk-user';
+import { currentUserId, listPlayers } from '@/lib/auth';
 import { isLocked, kickoffUtc } from '@/lib/lock';
+import NamePicker from '@/components/auth/NamePicker';
 
 export const dynamic = 'force-dynamic';
 
 export default async function LandingPage() {
-  const userId = await ensureUser();
+  const userId = await currentUserId();
   const locked = isLocked();
   const kickoff = kickoffUtc();
+  const players = userId ? [] : await listPlayers();
 
   return (
     <div className="flex min-h-[85vh] flex-col items-center justify-center gap-8 py-12 text-center">
@@ -16,8 +17,8 @@ export default async function LandingPage() {
         <div className="text-6xl">🏆</div>
         <h1 className="text-3xl font-bold tracking-tight">WC26 Bracket Pool</h1>
         <p className="text-muted">
-          Pick your group winners, call the knockout rounds, and battle your
-          friends all the way to MetLife on July 19.
+          Pick your group winners, call the knockout rounds, and battle the
+          family all the way to MetLife on July 19.
         </p>
       </div>
 
@@ -32,11 +33,7 @@ export default async function LandingPage() {
       )}
 
       {!userId ? (
-        <SignInButton mode="modal">
-          <button className="min-h-12 w-full max-w-xs rounded-xl bg-accent px-6 text-lg font-semibold text-black">
-            Sign in to play
-          </button>
-        </SignInButton>
+        <NamePicker players={players} />
       ) : (
         <Link
           href="/bracket"

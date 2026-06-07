@@ -1,5 +1,5 @@
 {
-  "id": "146cd8c4-c133-4b35-9808-341e988a70dc",
+  "id": "77015ae6-14cb-402a-b7a2-17158a6098b9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -55,9 +55,9 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "owner_clerk_id": {
-          "name": "owner_clerk_id",
-          "type": "text",
+        "owner_id": {
+          "name": "owner_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -119,7 +119,7 @@
           "name": "brackets_owner_pool_unique",
           "columns": [
             {
-              "expression": "owner_clerk_id",
+              "expression": "owner_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -333,9 +333,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "clerk_id": {
-          "name": "clerk_id",
-          "type": "text",
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -350,11 +350,11 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "pool_members_pool_id_clerk_id_pk": {
-          "name": "pool_members_pool_id_clerk_id_pk",
+        "pool_members_pool_id_user_id_pk": {
+          "name": "pool_members_pool_id_user_id_pk",
           "columns": [
             "pool_id",
-            "clerk_id"
+            "user_id"
           ]
         }
       },
@@ -380,11 +380,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "owner_clerk_id": {
-          "name": "owner_clerk_id",
-          "type": "text",
+        "owner_id": {
+          "name": "owner_id",
+          "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "join_code": {
           "name": "join_code",
@@ -489,11 +489,12 @@
       "name": "users",
       "schema": "",
       "columns": {
-        "clerk_id": {
-          "name": "clerk_id",
-          "type": "text",
+        "id": {
+          "name": "id",
+          "type": "uuid",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "default": "gen_random_uuid()"
         },
         "display_name": {
           "name": "display_name",
@@ -512,7 +513,15 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "users_display_name_unique": {
+          "name": "users_display_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "display_name"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

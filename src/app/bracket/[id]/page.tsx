@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation';
 import { asc, eq } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { bracketScores, teams, users } from '@/lib/schema';
 import { bracketAccess, loadBracket } from '@/lib/access';
+import { currentUserId } from '@/lib/auth';
 import BracketSummary from '@/components/brackets/BracketSummary';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,7 @@ export default async function BracketViewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { userId } = await auth();
+  const userId = await currentUserId();
 
   const bracket = await loadBracket(id);
   if (!bracket) notFound();
@@ -27,7 +27,7 @@ export default async function BracketViewPage({
   const [owner] = await db
     .select({ displayName: users.displayName })
     .from(users)
-    .where(eq(users.clerkId, bracket.ownerClerkId))
+    .where(eq(users.id, bracket.ownerId))
     .limit(1);
 
   const scores = await db

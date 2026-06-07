@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { brackets, bracketScores, poolMembers, pools, users } from '@/lib/schema';
-import { ensureUser } from '@/lib/clerk-user';
+import { currentUserId } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,7 @@ interface Row {
   rank: number | null;
   bracketId: string | null;
   bracketName: string;
-  ownerClerkId: string;
+  ownerId: string;
   ownerName: string;
   points: number;
   tiebreak: number;
@@ -24,14 +24,14 @@ export default async function LeaderboardPage({
 }: {
   searchParams: Promise<{ pool?: string }>;
 }) {
-  const userId = await ensureUser();
+  const userId = await currentUserId();
   if (!userId) redirect('/');
 
   const memberships = await db
     .select({ poolId: poolMembers.poolId, poolName: pools.name, joinCode: pools.joinCode })
     .from(poolMembers)
     .innerJoin(pools, eq(pools.id, poolMembers.poolId))
-    .where(eq(poolMembers.clerkId, userId));
+    .where(eq(poolMembers.userId, userId));
 
   if (memberships.length === 0) {
     return (
@@ -49,9 +49,9 @@ export default async function LeaderboardPage({
     memberships[0];
 
   const members = await db
-    .select({ clerkId: poolMembers.clerkId, displayName: users.displayName })
+    .select({ userId: poolMembers.userId, displayName: users.displayName })
     .from(poolMembers)
-    .innerJoin(users, eq(users.clerkId, poolMembers.clerkId))
+    .innerJoin(users, eq(users.id, poolMembers.userId))
     .where(eq(poolMembers.poolId, active.poolId));
 
   const poolBrackets = await db
@@ -74,14 +74,14 @@ export default async function LeaderboardPage({
     }
   }
 
-  const bracketByOwner = new Map(poolBrackets.map((b) => [b.ownerClerkId, b]));
+  const bracketByOwner = new Map(poolBrackets.map((b) => [b.ownerId, b]));
   const rows: Row[] = members.map((m) => {
-    const b = bracketByOwner.get(m.clerkId);
+    const b = bracketByOwner.get(m.userId);
     return {
       rank: null,
       bracketId: b?.id ?? null,
       bracketName: b?.name ?? 'No bracket',
-      ownerClerkId: m.clerkId,
+      ownerId: m.userId,
       ownerName: m.displayName,
       points: b?.totalPoints ?? 0,
       tiebreak: b ? (tiebreakByBracket.get(b.id) ?? 0) : 0,
@@ -146,7 +146,7 @@ export default async function LeaderboardPage({
             </div>
           );
           return (
-            <li key={row.ownerClerkId}>
+            <li key={row.ownerId}>
               {row.bracketId ? <Link href={`/bracket/${row.bracketId}`}>{inner}</Link> : inner}
             </li>
           );

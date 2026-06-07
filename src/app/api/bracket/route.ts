@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { brackets } from '@/lib/schema';
 import { isPoolMember } from '@/lib/access';
+import { currentUserId } from '@/lib/auth';
 import { isLocked } from '@/lib/lock';
 import { isComplete, pruneDownstream, validatePredictions } from '@/lib/predictions';
 import { emptyPredictions } from '@/types/bracket';
@@ -28,13 +28,13 @@ async function loadOwned(id: string, userId: string) {
   const [row] = await db
     .select()
     .from(brackets)
-    .where(and(eq(brackets.id, id), eq(brackets.ownerClerkId, userId)))
+    .where(and(eq(brackets.id, id), eq(brackets.ownerId, userId)))
     .limit(1);
   return row ?? null;
 }
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
+  const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const parsed = postSchema.safeParse(await req.json().catch(() => null));
@@ -52,14 +52,14 @@ export async function POST(req: Request) {
     const [existing] = await db
       .select()
       .from(brackets)
-      .where(and(eq(brackets.ownerClerkId, userId), eq(brackets.poolId, body.poolId)))
+      .where(and(eq(brackets.ownerId, userId), eq(brackets.poolId, body.poolId)))
       .limit(1);
     if (existing) return NextResponse.json({ bracket: existing });
 
     const [bracket] = await db
       .insert(brackets)
       .values({
-        ownerClerkId: userId,
+        ownerId: userId,
         poolId: body.poolId,
         name: body.name,
         predictions: emptyPredictions(),
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const { userId } = await auth();
+  const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { poolMembers, pools } from '@/lib/schema';
+import { currentUserId } from '@/lib/auth';
 
 const bodySchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('create'), name: z.string().trim().min(1).max(60) }),
@@ -22,7 +22,7 @@ function makeJoinCode(): string {
 }
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
+  const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
@@ -36,11 +36,11 @@ export async function POST(req: Request) {
       try {
         const [pool] = await db
           .insert(pools)
-          .values({ name: body.name, ownerClerkId: userId, joinCode })
+          .values({ name: body.name, ownerId: userId, joinCode })
           .returning();
         await db
           .insert(poolMembers)
-          .values({ poolId: pool.id, clerkId: userId })
+          .values({ poolId: pool.id, userId })
           .onConflictDoNothing();
         return NextResponse.json({ pool });
       } catch {
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
 
   await db
     .insert(poolMembers)
-    .values({ poolId: pool.id, clerkId: userId })
+    .values({ poolId: pool.id, userId })
     .onConflictDoNothing();
   return NextResponse.json({ pool });
 }

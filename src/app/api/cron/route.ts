@@ -5,9 +5,10 @@ export const maxDuration = 60;
 
 const IDLE_FLOOR_MS = 30 * 60 * 1000; // off-window cadence: 30 minutes
 
-// Vercel Cron entry, scheduled every 5 minutes. Self-gates to protect
-// the ~100 req/day provider budget: full sync every tick only while a
-// match is live or imminent, otherwise at most every 30 minutes.
+// Cron entry (Vercel Cron or an external pinger), every 2 minutes.
+// Self-gates to stay tidy within football-data.org's 10 req/min: full
+// sync every tick only while a match is live or imminent, otherwise at
+// most every 30 minutes.
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {

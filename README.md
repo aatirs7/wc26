@@ -7,15 +7,15 @@ score automatically as real results sync in.
 
 ## Stack
 
-Next.js (App Router) + TypeScript, Tailwind CSS, Clerk auth, Neon Postgres
-via Drizzle ORM, API-Football for live results, Vercel hosting + cron.
+Next.js (App Router) + TypeScript, Tailwind CSS, name-picker auth (family
+scale, no passwords), Neon Postgres via Drizzle ORM, football-data.org for
+live results, Vercel hosting + cron.
 
 ## Setup
 
 1. Copy `.env.example` to `.env.local` and fill in:
    - `DATABASE_URL` from Neon
-   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY` from Clerk
-   - `API_FOOTBALL_KEY` from api-sports.io
+   - `FOOTBALL_DATA_TOKEN` free personal token from football-data.org
    - `CRON_SECRET` any long random string
    - `TOURNAMENT_KICKOFF_UTC=2026-06-11T19:00:00Z`
 2. `npm install`
@@ -43,13 +43,22 @@ Groups pay out when all 6 group matches finish; third-place picks pay out
 once every group is decided. Ties break by champion+final points, then
 earliest submit time.
 
+## Auth
+
+No accounts or passwords: the landing page lists everyone in the family;
+tap your name (or type a new one) and a year-long cookie remembers you.
+Anyone can pick anyone's name, which is accepted at this scale. Switch
+players from the Me tab.
+
 ## Sync
 
-`/api/cron` runs every 5 minutes on Vercel Cron and self-gates: full
-provider sync each tick only while matches are live or imminent, otherwise
-at most every 30 minutes, keeping API-Football usage under the free 100
-requests/day. Note: Vercel Hobby crons run at most daily; on Hobby, point
-a free external pinger (e.g. cron-job.org) at
+Live results come from football-data.org (free tier: 10 requests/min, no
+daily cap; scores can lag real time slightly). `/api/cron` runs every 2
+minutes and self-gates: matches sync each tick only while a match is live
+or imminent, standings refresh at most every 30 minutes or right after a
+match finishes, and everything drops to a 30-minute floor between
+sessions. Note: Vercel Hobby crons run at most daily; on Hobby, point a
+free external pinger (e.g. cron-job.org) at
 `GET /api/cron` with header `Authorization: Bearer <CRON_SECRET>`.
 
 Manual sync: `POST /api/sync` with the same header. Add `?dry=1` to fetch
@@ -66,6 +75,8 @@ the league/season mapping on first contact with live data.
 ## House rules
 
 - Results provider calls never run client-side; the app only reads Neon.
+- The provider is swappable behind `src/lib/scores-provider.ts`; switching
+  back to API-Football or another source is a config flip, not a refactor.
 - Brackets are viewable read-only by fellow pool members at any time,
   including before lock. Owners can edit until kickoff.
 - No em dashes in code, copy, or comments.

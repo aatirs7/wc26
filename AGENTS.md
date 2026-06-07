@@ -7,7 +7,12 @@ This version has breaking changes - APIs, conventions, and file structure may al
 # Project rules (WC26 Bracket Pool)
 
 - No em dashes anywhere in code, copy, or comments.
-- API-Football is server-side only (cron/sync); the app reads Neon.
+- The scores provider (football-data.org, swappable behind
+  src/lib/scores-provider.ts) is server-side only (cron/sync); the app
+  reads Neon.
+- Auth is a name-picker cookie (src/lib/auth.ts), intentionally
+  password-free for family scale. Do not reintroduce an auth provider
+  without being asked.
 - Scoring weights live in src/lib/constants.ts; the engine in
   src/lib/scoring.ts recomputes from scratch and must stay idempotent.
 - Brackets: viewable read-only by pool members at ANY time (owner
