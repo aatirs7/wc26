@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ClipboardList } from 'lucide-react';
 
 export default function StartBracket({ poolId }: { poolId: string }) {
   const router = useRouter();
@@ -34,7 +35,9 @@ export default function StartBracket({ poolId }: { poolId: string }) {
 
   return (
     <div className="card mt-8 space-y-4 p-5 text-center reveal">
-      <div className="text-4xl">🏟️</div>
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10 ring-1 ring-accent/30">
+        <ClipboardList className="h-7 w-7 text-accent" strokeWidth={2} />
+      </div>
       <div>
         <h2 className="font-display text-3xl">Name your bracket</h2>
         <p className="mt-1 text-sm text-muted">Give it some swagger.</p>

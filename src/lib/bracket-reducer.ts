@@ -13,12 +13,15 @@ import {
 } from './constants';
 import { pruneDownstream, qualifiersOf } from './predictions';
 
+import type { FillKey } from './knockout-bracket';
+
 export type BracketAction =
   | { type: 'load'; predictions: Predictions }
   | { type: 'rankGroupTeam'; letter: GroupLetter; code: string }
   | { type: 'toggleThird'; code: string }
   | { type: 'toggleRoundPick'; round: KnockoutRoundKey; code: string }
-  | { type: 'toggleChampion'; code: string };
+  | { type: 'toggleChampion'; code: string }
+  | { type: 'pickWinner'; fills: FillKey; winner: string; loser: string | null };
 
 export function poolForRound(p: Predictions, round: KnockoutRoundKey): Set<string> {
   const idx = KNOCKOUT_ROUNDS.indexOf(round);
@@ -90,6 +93,34 @@ export function bracketReducer(state: Predictions, action: BracketAction): Predi
       }
       if (!state.knockout.final.includes(code)) return state;
       return { ...state, knockout: { ...state.knockout, champion: code } };
+    }
+
+    case 'pickWinner': {
+      // Head-to-head: set the winner of one tie. Drops the beaten team
+      // (and its downstream) so each tie yields exactly one advancer.
+      const { fills, winner, loser } = action;
+      if (fills === 'champion') {
+        return {
+          ...state,
+          knockout: {
+            ...state.knockout,
+            champion: state.knockout.champion === winner ? undefined : winner,
+          },
+        };
+      }
+      const set = state.knockout[fills];
+      if (set.includes(winner)) {
+        // Tapping the current winner again clears the tie.
+        return pruneDownstream({
+          ...state,
+          knockout: { ...state.knockout, [fills]: set.filter((c) => c !== winner) },
+        });
+      }
+      const next = [...set.filter((c) => c !== loser), winner];
+      return pruneDownstream({
+        ...state,
+        knockout: { ...state.knockout, [fills]: next },
+      });
     }
   }
 }

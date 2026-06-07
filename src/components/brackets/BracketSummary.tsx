@@ -1,6 +1,8 @@
 import type { Predictions } from '@/types/bracket';
 import type { Team } from '@/types/team';
-import { GROUP_LETTERS, KNOCKOUT_ROUNDS, KNOCKOUT_ROUND_LABELS } from '@/lib/constants';
+import { GROUP_LETTERS } from '@/lib/constants';
+import { KO_ROUNDS, resolveBracket } from '@/lib/knockout-bracket';
+import KnockoutBracket from '@/components/bracket/KnockoutBracket';
 
 interface Props {
   predictions: Predictions;
@@ -9,29 +11,17 @@ interface Props {
 
 const MEDAL: Record<number, string> = { 1: 'medal-1', 2: 'medal-2', 3: 'medal-3', 4: 'medal-4' };
 
-// Read-only render of a bracket, used for locked views and viewing
-// other people's brackets. Server-safe, no client hooks.
+// Read-only render of a bracket, used for locked views and viewing other
+// people's brackets. Server-safe; KnockoutBracket renders without onPick.
 export default function BracketSummary({ predictions, teams }: Props) {
   const byCode = new Map(teams.map((t) => [t.code, t]));
-  const chip = (code: string | undefined, key?: string) => {
-    if (!code) return null;
-    const t = byCode.get(code);
-    return (
-      <span
-        key={key ?? code}
-        className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-white/[0.03] px-2.5 py-1 text-xs font-semibold"
-      >
-        <span>{t?.flag}</span>
-        {code}
-      </span>
-    );
-  };
+  const resolved = resolveBracket(predictions);
 
   const champion = predictions.knockout.champion;
   const championTeam = champion ? byCode.get(champion) : undefined;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       {championTeam ? (
         <div className="card relative overflow-hidden p-5 text-center ring-1">
           <div className="text-5xl">{championTeam.flag}</div>
@@ -42,18 +32,16 @@ export default function BracketSummary({ predictions, teams }: Props) {
         </div>
       ) : null}
 
-      {[...KNOCKOUT_ROUNDS].reverse().map((round) => (
-        <section key={round}>
-          <h3 className="mb-2 font-display text-xl text-muted">
-            Reaches the {KNOCKOUT_ROUND_LABELS[round]}
-          </h3>
-          <div className="flex flex-wrap gap-1.5">
-            {predictions.knockout[round].length > 0
-              ? predictions.knockout[round].map((code) => chip(code))
-              : <span className="text-xs text-muted">No picks</span>}
-          </div>
-        </section>
-      ))}
+      {[...KO_ROUNDS].reverse().map((round) => {
+        const ties = resolved[round.key].filter((m) => m.aCode || m.bCode);
+        if (ties.length === 0) return null;
+        return (
+          <section key={round.key}>
+            <h3 className="mb-2 font-display text-xl text-muted">{round.title}</h3>
+            <KnockoutBracket matchups={resolved[round.key]} teamsByCode={byCode} fills={round.fills} />
+          </section>
+        );
+      })}
 
       <section>
         <h3 className="mb-2 font-display text-xl text-muted">Group finishes</h3>
@@ -63,9 +51,7 @@ export default function BracketSummary({ predictions, teams }: Props) {
             const ordered = [g?.first, g?.second, g?.third, g?.fourth];
             return (
               <div key={letter} className="card p-2.5">
-                <div className="mb-1.5 font-display text-base text-foreground">
-                  Group {letter}
-                </div>
+                <div className="mb-1.5 font-display text-base text-foreground">Group {letter}</div>
                 <ol className="space-y-1">
                   {ordered.map((code, i) => {
                     const t = code ? byCode.get(code) : undefined;
@@ -96,9 +82,22 @@ export default function BracketSummary({ predictions, teams }: Props) {
       <section>
         <h3 className="mb-2 font-display text-xl text-muted">Best third-placed qualifiers</h3>
         <div className="flex flex-wrap gap-1.5">
-          {predictions.thirdPlace.length > 0
-            ? predictions.thirdPlace.map((code) => chip(code))
-            : <span className="text-xs text-muted">No picks</span>}
+          {predictions.thirdPlace.length > 0 ? (
+            predictions.thirdPlace.map((code) => {
+              const t = byCode.get(code);
+              return (
+                <span
+                  key={code}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-white/[0.03] px-2.5 py-1 text-xs font-semibold"
+                >
+                  <span>{t?.flag}</span>
+                  {code}
+                </span>
+              );
+            })
+          ) : (
+            <span className="text-xs text-muted">No picks</span>
+          )}
         </div>
       </section>
     </div>

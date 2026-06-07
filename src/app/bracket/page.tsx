@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { Lock } from 'lucide-react';
 import { brackets, poolMembers, pools, teams } from '@/lib/schema';
 import { currentUserId } from '@/lib/auth';
 import { isLocked } from '@/lib/lock';
@@ -77,7 +78,7 @@ export default async function BracketPage({
       {!bracket ? (
         locked ? (
           <div className="card mt-8 p-6 text-center">
-            <div className="text-4xl">🔒</div>
+            <Lock className="mx-auto h-8 w-8 text-muted" />
             <h1 className="mt-2 font-display text-3xl">Brackets are locked</h1>
             <p className="mt-2 text-sm text-muted">
               The tournament has started, so new brackets cannot be entered.
@@ -92,7 +93,7 @@ export default async function BracketPage({
           <header>
             <h1 className="font-display text-4xl leading-none">{bracket.name}</h1>
             <p className="mt-1 text-sm text-muted">
-              {bracket.submitted ? 'Locked in. Good luck! 🍀' : 'Not submitted before kickoff.'}
+              {bracket.submitted ? 'Locked in. Good luck.' : 'Not submitted before kickoff.'}
             </p>
           </header>
           <BracketSummary predictions={bracket.predictions} teams={allTeams} />
