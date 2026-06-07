@@ -170,6 +170,33 @@ export interface ResolvedMatchup {
 
 export type ResolvedBracket = Record<KoRound['key'], ResolvedMatchup[]>;
 
+export const ALL_MATCHUPS: MatchupDef[] = [...R32, ...R16, ...QF, ...SF, ...FINAL];
+export const MATCHUP_BY_ID = new Map(ALL_MATCHUPS.map((m) => [m.id, m]));
+export const ROOT_ID = 104;
+
+const FILLS_BY_ID = new Map<number, FillKey>();
+for (const round of KO_ROUNDS) for (const m of round.matchups) FILLS_BY_ID.set(m.id, round.fills);
+
+export function fillsForId(id: number): FillKey {
+  return FILLS_BY_ID.get(id) ?? 'champion';
+}
+
+// The two matchup ids that feed this one, or null for a Round-of-32 tie.
+export function feedersOf(id: number): [number, number] | null {
+  const def = MATCHUP_BY_ID.get(id);
+  if (!def) return null;
+  if (def.a.kind === 'feeder' && def.b.kind === 'feeder') return [def.a.from, def.b.from];
+  return null;
+}
+
+// Flattened lookup of every resolved tie by matchup id.
+export function resolveById(p: Predictions): Map<number, ResolvedMatchup> {
+  const byRound = resolveBracket(p);
+  const out = new Map<number, ResolvedMatchup>();
+  for (const round of KO_ROUNDS) for (const m of byRound[round.key]) out.set(m.id, m);
+  return out;
+}
+
 export function resolveBracket(p: Predictions): ResolvedBracket {
   const thirds = assignThirds(p);
   const winnerById = new Map<number, string | null>();

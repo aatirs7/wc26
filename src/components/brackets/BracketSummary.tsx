@@ -1,8 +1,7 @@
 import type { Predictions } from '@/types/bracket';
 import type { Team } from '@/types/team';
 import { GROUP_LETTERS } from '@/lib/constants';
-import { KO_ROUNDS, resolveBracket } from '@/lib/knockout-bracket';
-import KnockoutBracket from '@/components/bracket/KnockoutBracket';
+import FullBracket from '@/components/bracket/FullBracket';
 
 interface Props {
   predictions: Predictions;
@@ -12,10 +11,9 @@ interface Props {
 const MEDAL: Record<number, string> = { 1: 'medal-1', 2: 'medal-2', 3: 'medal-3', 4: 'medal-4' };
 
 // Read-only render of a bracket, used for locked views and viewing other
-// people's brackets. Server-safe; KnockoutBracket renders without onPick.
+// people's brackets. Server-safe; FullBracket renders without onPick.
 export default function BracketSummary({ predictions, teams }: Props) {
   const byCode = new Map(teams.map((t) => [t.code, t]));
-  const resolved = resolveBracket(predictions);
 
   const champion = predictions.knockout.champion;
   const championTeam = champion ? byCode.get(champion) : undefined;
@@ -32,16 +30,10 @@ export default function BracketSummary({ predictions, teams }: Props) {
         </div>
       ) : null}
 
-      {[...KO_ROUNDS].reverse().map((round) => {
-        const ties = resolved[round.key].filter((m) => m.aCode || m.bCode);
-        if (ties.length === 0) return null;
-        return (
-          <section key={round.key}>
-            <h3 className="mb-2 font-display text-xl text-muted">{round.title}</h3>
-            <KnockoutBracket matchups={resolved[round.key]} teamsByCode={byCode} fills={round.fills} />
-          </section>
-        );
-      })}
+      <section>
+        <h3 className="mb-2 font-display text-xl text-muted">Knockout bracket</h3>
+        <FullBracket predictions={predictions} teamsByCode={byCode} />
+      </section>
 
       <section>
         <h3 className="mb-2 font-display text-xl text-muted">Group finishes</h3>
