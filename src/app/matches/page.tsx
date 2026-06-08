@@ -3,6 +3,7 @@ import { asc } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { groupStandings, matches, teams } from '@/lib/schema';
 import { GROUP_LETTERS } from '@/lib/constants';
+import { DISPLAY_TZ_LABEL, matchDayKey, matchDayLabel } from '@/lib/format-time';
 import MatchRow from '@/components/matches/MatchRow';
 import GroupStandingsTable from '@/components/matches/GroupStandingsTable';
 import LivePoller from '@/components/matches/LivePoller';
@@ -35,16 +36,17 @@ export default async function MatchesPage({
 
   const standings = showGroups ? await db.select().from(groupStandings) : [];
 
-  // Group fixtures by calendar day (UTC) for scannable sections.
+  // Group fixtures by calendar day in the display timezone so the heading
+  // matches the kickoff time shown on each row.
   const byDay = new Map<string, typeof allMatches>();
   for (const m of allMatches) {
-    const day = m.kickoffUtc.toISOString().slice(0, 10);
+    const day = matchDayKey(m.kickoffUtc);
     if (!byDay.has(day)) byDay.set(day, []);
     byDay.get(day)!.push(m);
   }
 
   // Jump to today (or the next day with matches) by listing past days last.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = matchDayKey(new Date());
   const days = [...byDay.keys()].sort();
   const upcoming = days.filter((d) => d >= today);
   const past = days.filter((d) => d < today).reverse();
@@ -84,14 +86,11 @@ export default async function MatchesPage({
         </div>
       ) : (
         <div className="space-y-5">
+          <p className="text-center text-xs text-muted-2">All times Eastern ({DISPLAY_TZ_LABEL})</p>
           {[...upcoming, ...past].map((day) => (
             <section key={day}>
               <h2 className="sticky top-0 z-10 mb-2 -mx-1 bg-bg/80 px-1 py-1 font-display text-lg tracking-wide text-muted backdrop-blur">
-                {new Date(`${day}T12:00:00Z`).toLocaleDateString(undefined, {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                })}
+                {matchDayLabel(new Date(`${day}T12:00:00Z`))}
               </h2>
               <div className="space-y-2">
                 {byDay.get(day)!.map((m) => (

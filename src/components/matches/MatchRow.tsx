@@ -1,6 +1,6 @@
 import type { Team } from '@/types/team';
+import { matchTime } from '@/lib/format-time';
 import StatusPill from './StatusPill';
-import LocalTime from './LocalTime';
 
 export interface MatchRowData {
   id: number;
@@ -81,7 +81,7 @@ export default function MatchRow({ match, teamsByCode }: Props) {
         <StatusPill status={match.status} />
         {match.status === 'scheduled' ? (
           <span className="font-display text-base leading-none text-foreground">
-            <LocalTime iso={match.kickoffUtc.toISOString()} />
+            {matchTime(match.kickoffUtc)}
           </span>
         ) : null}
         <span className="text-[0.62rem] font-semibold uppercase tracking-wider text-muted-2">

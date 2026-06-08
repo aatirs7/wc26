@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { Trophy, Lock, Timer } from 'lucide-react';
 import { currentUserId, listPlayers, LAST_NAME_COOKIE } from '@/lib/auth';
 import { isLocked, kickoffUtc } from '@/lib/lock';
+import { DISPLAY_TZ_LABEL, matchDayLabel, matchTime } from '@/lib/format-time';
 import NamePicker from '@/components/auth/NamePicker';
 
 export const dynamic = 'force-dynamic';
@@ -49,7 +50,7 @@ export default async function LandingPage() {
         {locked ? <Lock className="h-4 w-4" /> : <Timer className="h-4 w-4" />}
         {locked
           ? 'Brackets locked — the tournament is on'
-          : `Locks ${kickoff.toUTCString().replace('GMT', 'UTC')}`}
+          : `Locks ${matchDayLabel(kickoff)}, ${matchTime(kickoff)} ${DISPLAY_TZ_LABEL}`}
       </div>
 
       <div className="reveal w-full max-w-xs" style={{ animationDelay: '160ms' }}>
