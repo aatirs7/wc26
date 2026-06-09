@@ -1,4 +1,5 @@
 import { SCORING } from '@/lib/constants';
+import { PREDICT_EXACT_POINTS } from '@/lib/predict';
 
 export const dynamic = 'force-static';
 
@@ -83,6 +84,20 @@ export default function ScoringPage() {
           Group points arrive when a group finishes, third-place points once all 12 groups are done,
           and each knockout round as it completes.
         </Step>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-center font-display text-2xl">Bonus: score predictions</h2>
+        <p className="text-sm leading-relaxed text-muted">
+          On the <span className="text-foreground">Predict</span> page you can call the exact
+          scoreline of upcoming matches. Nail it and you bank{' '}
+          <span className="text-foreground">{PREDICT_EXACT_POINTS} bonus points</span>; anything else
+          scores nothing. Predictions open 24h before kickoff and lock when the match starts.
+        </p>
+        <p className="text-sm leading-relaxed text-muted">
+          Bonus points add straight into your combined total on the standings, so a hot prediction
+          streak can move you up the table even before the knockouts.
+        </p>
       </section>
 
       <section className="space-y-2">
