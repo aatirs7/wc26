@@ -255,13 +255,15 @@ export default async function HomePage({
             <Link
               key={f.href}
               href={f.href}
-              className={`card flex flex-col gap-2 p-4 active:scale-[0.98] ${
-                gold ? 'border-gold/30 bg-gold/[0.08]' : 'border-accent/30 bg-accent/[0.08]'
+              className={`card flex flex-col items-center gap-2 p-4 text-center shadow-lg active:scale-[0.98] ${
+                gold
+                  ? 'border-gold/50 bg-gold/[0.14] shadow-gold/20'
+                  : 'border-accent/50 bg-accent/[0.14] shadow-accent/20'
               }`}
             >
               <span
                 className={`flex h-11 w-11 items-center justify-center rounded-xl ring-1 ${
-                  gold ? 'bg-gold/15 ring-gold/30' : 'bg-accent/15 ring-accent/30'
+                  gold ? 'bg-gold/20 ring-gold/40' : 'bg-accent/20 ring-accent/40'
                 }`}
               >
                 <Icon className={`h-5 w-5 ${gold ? 'text-gold' : 'text-accent'}`} strokeWidth={2.2} />
