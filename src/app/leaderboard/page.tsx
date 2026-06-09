@@ -2,22 +2,30 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { brackets, bracketScores, poolMembers, pools, users } from '@/lib/schema';
+import {
+  brackets,
+  bracketScores,
+  matchPredictions,
+  poolMembers,
+  pools,
+  standingSnapshots,
+  users,
+} from '@/lib/schema';
 import { currentUserId } from '@/lib/auth';
+import Standings, { type PlayerRow } from '@/components/leaderboard/Standings';
 
 export const dynamic = 'force-dynamic';
 
-interface Row {
-  rank: number | null;
-  bracketId: string | null;
-  bracketName: string;
-  ownerId: string;
-  ownerName: string;
-  points: number;
-  tiebreak: number;
-  submitted: boolean;
-  lockedAtMs: number;
-}
+const ROUND_ORDER = ['groups', 'thirdPlace', 'r16', 'qf', 'sf', 'final', 'champion'] as const;
+const ROUND_LABELS: Record<string, string> = {
+  groups: 'Group finishes',
+  thirdPlace: 'Best thirds',
+  r16: 'Round of 16',
+  qf: 'Quarter-finals',
+  sf: 'Semi-finals',
+  final: 'Final',
+  champion: 'Champion',
+};
 
 export default async function LeaderboardPage({
   searchParams,
@@ -28,7 +36,7 @@ export default async function LeaderboardPage({
   if (!userId) redirect('/');
 
   const memberships = await db
-    .select({ poolId: poolMembers.poolId, poolName: pools.name, joinCode: pools.joinCode })
+    .select({ poolId: poolMembers.poolId, poolName: pools.name })
     .from(poolMembers)
     .innerJoin(pools, eq(pools.id, poolMembers.poolId))
     .where(eq(poolMembers.userId, userId));
@@ -53,11 +61,9 @@ export default async function LeaderboardPage({
     .from(poolMembers)
     .innerJoin(users, eq(users.id, poolMembers.userId))
     .where(eq(poolMembers.poolId, active.poolId));
+  const memberIds = members.map((m) => m.userId);
 
-  const poolBrackets = await db
-    .select()
-    .from(brackets)
-    .where(eq(brackets.poolId, active.poolId));
+  const poolBrackets = await db.select().from(brackets).where(eq(brackets.poolId, active.poolId));
 
   const scoreRows = poolBrackets.length
     ? await db
@@ -65,41 +71,85 @@ export default async function LeaderboardPage({
         .from(bracketScores)
         .where(inArray(bracketScores.bracketId, poolBrackets.map((b) => b.id)))
     : [];
-
-  // Tiebreaks: champion + final points, then earliest submit time.
+  const roundsByBracket = new Map<string, Map<string, number>>();
   const tiebreakByBracket = new Map<string, number>();
   for (const s of scoreRows) {
+    const m = roundsByBracket.get(s.bracketId) ?? new Map<string, number>();
+    m.set(s.roundKey, s.points);
+    roundsByBracket.set(s.bracketId, m);
     if (s.roundKey === 'champion' || s.roundKey === 'final') {
       tiebreakByBracket.set(s.bracketId, (tiebreakByBracket.get(s.bracketId) ?? 0) + s.points);
     }
   }
 
+  const predRows = memberIds.length
+    ? await db
+        .select({ userId: matchPredictions.userId, points: matchPredictions.points })
+        .from(matchPredictions)
+        .where(inArray(matchPredictions.userId, memberIds))
+    : [];
+  const bonusByUser = new Map<string, number>();
+  for (const p of predRows) bonusByUser.set(p.userId, (bonusByUser.get(p.userId) ?? 0) + p.points);
+
+  const snaps = await db
+    .select()
+    .from(standingSnapshots)
+    .where(eq(standingSnapshots.poolId, active.poolId));
+  const snapByUser = new Map(snaps.map((s) => [s.userId, s]));
+
   const bracketByOwner = new Map(poolBrackets.map((b) => [b.ownerId, b]));
-  const rows: Row[] = members.map((m) => {
+
+  // Combined standing = bracket points + score-prediction bonus.
+  const computed = members.map((m) => {
     const b = bracketByOwner.get(m.userId);
+    const bracketTotal = b?.totalPoints ?? 0;
+    const bonus = bonusByUser.get(m.userId) ?? 0;
+    const roundMap = b ? roundsByBracket.get(b.id) : undefined;
+    const rounds = ROUND_ORDER.map((k) => ({ label: ROUND_LABELS[k], pts: roundMap?.get(k) ?? 0 })).filter(
+      (r) => r.pts > 0,
+    );
     return {
-      rank: null,
-      bracketId: b?.id ?? null,
-      bracketName: b?.name ?? 'No bracket',
       ownerId: m.userId,
-      ownerName: m.displayName,
-      points: b?.totalPoints ?? 0,
-      tiebreak: b ? (tiebreakByBracket.get(b.id) ?? 0) : 0,
+      name: m.displayName,
+      bracketId: b?.id ?? null,
+      bracketName: b?.name ?? null,
+      bracketTotal,
+      bonus,
+      combined: bracketTotal + bonus,
       submitted: b?.submitted ?? false,
+      tiebreak: b ? tiebreakByBracket.get(b.id) ?? 0 : 0,
       lockedAtMs: b?.lockedAt?.getTime() ?? Number.MAX_SAFE_INTEGER,
+      rounds,
     };
   });
 
-  rows.sort((a, b) => {
+  computed.sort((a, b) => {
+    if (b.combined !== a.combined) return b.combined - a.combined;
     if (a.submitted !== b.submitted) return a.submitted ? -1 : 1;
-    if (b.points !== a.points) return b.points - a.points;
     if (b.tiebreak !== a.tiebreak) return b.tiebreak - a.tiebreak;
     return a.lockedAtMs - b.lockedAtMs;
   });
-  let rank = 0;
-  for (const r of rows) {
-    if (r.submitted) r.rank = ++rank;
-  }
+
+  const rows: PlayerRow[] = computed.map((c, i) => {
+    const rank = i + 1;
+    const snap = snapByUser.get(c.ownerId);
+    const rankDelta = snap?.rank != null ? snap.rank - rank : 0;
+    const gained = snap ? c.combined - snap.points : 0;
+    return {
+      ownerId: c.ownerId,
+      name: c.name,
+      bracketName: c.bracketName,
+      bracketId: c.bracketId,
+      rank,
+      combined: c.combined,
+      bracketTotal: c.bracketTotal,
+      bonus: c.bonus,
+      submitted: c.submitted,
+      rounds: c.rounds,
+      rankDelta,
+      gained,
+    };
+  });
 
   const ordinal = (n: number) => {
     const s = ['th', 'st', 'nd', 'rd'];
@@ -112,6 +162,7 @@ export default async function LeaderboardPage({
     <div className="space-y-4 py-4">
       <header className="pt-2 text-center">
         <h1 className="font-display text-4xl leading-none">Standings</h1>
+        <p className="mt-1 text-xs text-muted">Bracket + score-prediction bonus</p>
       </header>
 
       {me ? (
@@ -121,24 +172,18 @@ export default async function LeaderboardPage({
               Your rank
             </div>
             <div className="font-display text-3xl leading-none">
-              {me.submitted && me.rank ? (
-                <>
-                  {ordinal(me.rank)} <span className="text-muted">of {rows.length}</span>
-                </>
-              ) : (
-                <span className="text-gold">Not locked in</span>
-              )}
+              {ordinal(me.rank)} <span className="text-muted">of {rows.length}</span>
             </div>
           </div>
           <div className="text-right">
-            <div className="font-display text-4xl leading-none text-accent">{me.points}</div>
+            <div className="font-display text-4xl leading-none text-accent">{me.combined}</div>
             <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted">pts</div>
           </div>
         </div>
       ) : null}
 
       {memberships.length > 1 ? (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex justify-center gap-2 overflow-x-auto pb-1">
           {memberships.map((m) => (
             <Link
               key={m.poolId}
@@ -155,47 +200,11 @@ export default async function LeaderboardPage({
         </div>
       ) : null}
 
-      <ol className="space-y-2">
-        {rows.map((row) => {
-          const medal = row.rank && row.rank <= 3 ? `medal-${row.rank}` : '';
-          const isMe = row.ownerId === userId;
-          const inner = (
-            <div
-              className={`card flex min-h-14 items-center gap-3 px-3 py-2.5 ${
-                isMe ? 'border-accent bg-accent/[0.06]' : row.rank && row.rank <= 3 ? `ring-${row.rank}` : ''
-              } ${!row.submitted ? 'opacity-60' : ''}`}
-            >
-              <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-display text-lg ${
-                  medal || 'bg-white/[0.04] text-muted'
-                }`}
-              >
-                {row.rank ?? '–'}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="truncate text-sm font-bold">{row.bracketName}</span>
-                  {isMe ? (
-                    <span className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[0.55rem] font-bold uppercase tracking-wider text-[var(--accent-ink)]">
-                      You
-                    </span>
-                  ) : null}
-                </div>
-                <div className="truncate text-xs text-muted">
-                  {row.ownerName}
-                  {!row.submitted ? ' · did not lock' : ''}
-                </div>
-              </div>
-              <span className="font-display text-2xl leading-none text-accent">{row.points}</span>
-            </div>
-          );
-          return (
-            <li key={row.ownerId}>
-              {row.bracketId ? <Link href={`/bracket/${row.bracketId}`}>{inner}</Link> : inner}
-            </li>
-          );
-        })}
-      </ol>
+      <p className="text-center text-[0.7rem] text-muted-2">
+        Tap a player to see where their points come from.
+      </p>
+
+      <Standings rows={rows} meId={userId} />
     </div>
   );
 }
