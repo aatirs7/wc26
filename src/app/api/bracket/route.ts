@@ -14,6 +14,8 @@ const postSchema = z.discriminatedUnion('action', [
     action: z.literal('create'),
     poolId: z.string().uuid(),
     name: z.string().trim().min(1).max(60).default('My bracket'),
+    // Optionally seed this bracket's picks from another bracket you own.
+    copyFrom: z.string().uuid().optional(),
   }),
   z.object({ action: z.literal('submit'), id: z.string().uuid() }),
 ]);
@@ -56,13 +58,26 @@ export async function POST(req: Request) {
       .limit(1);
     if (existing) return NextResponse.json({ bracket: existing });
 
+    // Seed picks from an owned bracket when asked, else start blank.
+    let predictions = emptyPredictions();
+    if (body.copyFrom) {
+      const src = await loadOwned(body.copyFrom, userId);
+      if (src) {
+        try {
+          predictions = pruneDownstream(validatePredictions(src.predictions));
+        } catch {
+          predictions = emptyPredictions();
+        }
+      }
+    }
+
     const [bracket] = await db
       .insert(brackets)
       .values({
         ownerId: userId,
         poolId: body.poolId,
         name: body.name,
-        predictions: emptyPredictions(),
+        predictions,
       })
       .returning();
     return NextResponse.json({ bracket });
