@@ -54,7 +54,11 @@ export default function BracketBuilder({ bracket, teams }: Props) {
   const [predictions, dispatch] = useReducer(bracketReducer, bracket.predictions, (p) =>
     bracketReducer(p, { type: 'load', predictions: p }),
   );
-  const [step, setStep] = useState<StepKey>('groups');
+  // A finished bracket opens straight to the full knockout view instead of
+  // dropping you back at the group-stage seeding every time.
+  const [step, setStep] = useState<StepKey>(() =>
+    isComplete(bracket.predictions) ? 'knockout' : 'groups',
+  );
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [submitted, setSubmitted] = useState(bracket.submitted);
   const [submitting, setSubmitting] = useState(false);
@@ -147,12 +151,6 @@ export default function BracketBuilder({ bracket, teams }: Props) {
         How it&apos;s scored
       </Link>
 
-      {submitted ? (
-        <p className="mb-3 rounded-xl border border-accent/40 bg-accent/[0.08] p-3 text-sm text-accent">
-          Bracket submitted. You can still tweak picks until kickoff; changing
-          anything means you need to submit again.
-        </p>
-      ) : null}
       {error ? (
         <p className="mb-3 rounded-xl border border-live/40 bg-live/[0.08] p-3 text-sm text-live">
           {error}
@@ -244,9 +242,7 @@ export default function BracketBuilder({ bracket, teams }: Props) {
 
       <SaveSubmitBar
         saveStatus={saveStatus}
-        canBack={stepIndex > 0}
         canNext={stepIndex < STEP_ORDER.length - 1}
-        onBack={() => setStep(STEP_ORDER[stepIndex - 1])}
         onNext={() => setStep(STEP_ORDER[stepIndex + 1])}
         showSubmit={step === 'knockout'}
         submitEnabled={complete}
