@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { Trophy, Lock, Timer } from 'lucide-react';
 import { currentUserId, listPlayers, LAST_NAME_COOKIE } from '@/lib/auth';
 import { isLocked, kickoffUtc } from '@/lib/lock';
@@ -10,6 +11,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function LandingPage() {
   const userId = await currentUserId();
+  // Signed-in players land on their dashboard; the hero is for guests.
+  if (userId) redirect('/home');
   const locked = isLocked();
   const kickoff = kickoffUtc();
   const players = userId ? [] : await listPlayers();

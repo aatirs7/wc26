@@ -23,7 +23,7 @@ export default function NamePicker({ players, lastName }: Props) {
         body: JSON.stringify({ name: player.displayName }),
       });
       if (!res.ok) throw new Error('sign in failed');
-      router.push('/bracket');
+      router.push('/home');
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'sign in failed');
