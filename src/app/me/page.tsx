@@ -7,6 +7,7 @@ import { isLocked } from '@/lib/lock';
 import RenameBracket from '@/components/me/RenameBracket';
 import BracketControls from '@/components/me/BracketControls';
 import InstallGuide from '@/components/me/InstallGuide';
+import RenameSelf from '@/components/me/RenameSelf';
 import SwitchPlayer from '@/components/auth/SwitchPlayer';
 
 export const dynamic = 'force-dynamic';
@@ -50,6 +51,7 @@ export default async function MePage() {
             {isLocked() ? 'Tournament running' : 'Editable until kickoff'}
           </p>
         </div>
+        <RenameSelf currentName={me?.displayName ?? ''} />
         <SwitchPlayer />
       </header>
 
