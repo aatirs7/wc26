@@ -165,7 +165,7 @@ export default async function HomePage({
 
   return (
     <div className="space-y-6 py-4">
-      <header className="reveal flex items-center gap-3 pt-2">
+      <header className="reveal flex flex-col items-center gap-2 pt-2 text-center">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent font-display text-2xl text-[var(--accent-ink)]">
           {(me?.displayName ?? 'Y').slice(0, 1).toUpperCase()}
         </span>
