@@ -166,18 +166,16 @@ export default async function LeaderboardPage({
       </header>
 
       {me ? (
-        <div className="card flex items-center justify-between px-4 py-3">
-          <div>
-            <div className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted">
-              Your rank
-            </div>
-            <div className="font-display text-3xl leading-none">
-              {ordinal(me.rank)} <span className="text-muted">of {rows.length}</span>
-            </div>
+        <div className="card flex flex-col items-center gap-1 px-4 py-3 text-center">
+          <div className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted">
+            Your rank
           </div>
-          <div className="text-right">
-            <div className="font-display text-4xl leading-none text-accent">{me.combined}</div>
-            <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted">pts</div>
+          <div className="font-display text-3xl leading-none">
+            {ordinal(me.rank)} <span className="text-muted">of {rows.length}</span>
+          </div>
+          <div className="font-display text-2xl leading-none text-accent">
+            {me.combined}{' '}
+            <span className="text-[0.6rem] font-bold uppercase tracking-wider text-muted">pts</span>
           </div>
         </div>
       ) : null}

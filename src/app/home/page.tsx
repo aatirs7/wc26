@@ -23,12 +23,16 @@ import Countdown from '@/components/home/Countdown';
 
 export const dynamic = 'force-dynamic';
 
+// The two headline activities get their own prominent buttons.
+const FEATURES: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: '/predict', label: 'Score predict', icon: Target },
+  { href: '/chat', label: 'Trash talk', icon: MessageCircle },
+];
+
 const JUMPS: { href: string; label: string; hint: string; icon: LucideIcon }[] = [
   { href: '/bracket', label: 'Bracket', hint: 'Build & view', icon: Trophy },
   { href: '/leaderboard', label: 'Standings', hint: 'Who is winning', icon: ListOrdered },
-  { href: '/predict', label: 'Score predict', hint: 'Call the scores', icon: Target },
   { href: '/matches', label: 'Matches', hint: 'Fixtures & groups', icon: CalendarDays },
-  { href: '/chat', label: 'Trash talk', hint: 'Talk your talk', icon: MessageCircle },
   { href: '/stats', label: 'Stats', hint: 'Adults vs kids', icon: BarChart3 },
 ];
 
@@ -242,8 +246,27 @@ export default async function HomePage({
         </Link>
       </section>
 
+      {/* Headline activities */}
+      <section className="reveal grid grid-cols-2 gap-3" style={{ animationDelay: '220ms' }}>
+        {FEATURES.map((f) => {
+          const Icon = f.icon;
+          return (
+            <Link
+              key={f.href}
+              href={f.href}
+              className="card flex flex-col items-center justify-center gap-2 border-accent/30 bg-accent/[0.06] p-4 text-center active:scale-[0.98]"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/15 ring-1 ring-accent/30">
+                <Icon className="h-5 w-5 text-accent" strokeWidth={2.2} />
+              </span>
+              <div className="font-display text-xl leading-none">{f.label}</div>
+            </Link>
+          );
+        })}
+      </section>
+
       {/* Quick jumps */}
-      <section className="reveal space-y-3" style={{ animationDelay: '240ms' }}>
+      <section className="reveal space-y-3" style={{ animationDelay: '280ms' }}>
         <h2 className="text-center font-display text-xl text-muted">Jump to</h2>
         <div className="grid grid-cols-2 gap-3">
           {JUMPS.map((j) => {
