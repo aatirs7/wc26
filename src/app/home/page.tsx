@@ -23,10 +23,10 @@ import Countdown from '@/components/home/Countdown';
 
 export const dynamic = 'force-dynamic';
 
-// The two headline activities get their own prominent buttons.
-const FEATURES: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: '/predict', label: 'Score predict', icon: Target },
-  { href: '/chat', label: 'Trash talk', icon: MessageCircle },
+// The two headline activities get their own prominent, colour-coded buttons.
+const FEATURES: { href: string; label: string; hint: string; icon: LucideIcon; tone: 'gold' | 'accent' }[] = [
+  { href: '/chat', label: 'Trash talk', hint: 'Chat your group', icon: MessageCircle, tone: 'gold' },
+  { href: '/predict', label: 'Score predict', hint: 'Call the scores', icon: Target, tone: 'accent' },
 ];
 
 const JUMPS: { href: string; label: string; hint: string; icon: LucideIcon }[] = [
@@ -250,16 +250,28 @@ export default async function HomePage({
       <section className="reveal grid grid-cols-2 gap-3" style={{ animationDelay: '220ms' }}>
         {FEATURES.map((f) => {
           const Icon = f.icon;
+          const gold = f.tone === 'gold';
           return (
             <Link
               key={f.href}
               href={f.href}
-              className="card flex flex-col items-center justify-center gap-2 border-accent/30 bg-accent/[0.06] p-4 text-center active:scale-[0.98]"
+              className={`card flex flex-col gap-2 p-4 active:scale-[0.98] ${
+                gold ? 'border-gold/30 bg-gold/[0.08]' : 'border-accent/30 bg-accent/[0.08]'
+              }`}
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/15 ring-1 ring-accent/30">
-                <Icon className="h-5 w-5 text-accent" strokeWidth={2.2} />
+              <span
+                className={`flex h-11 w-11 items-center justify-center rounded-xl ring-1 ${
+                  gold ? 'bg-gold/15 ring-gold/30' : 'bg-accent/15 ring-accent/30'
+                }`}
+              >
+                <Icon className={`h-5 w-5 ${gold ? 'text-gold' : 'text-accent'}`} strokeWidth={2.2} />
               </span>
-              <div className="font-display text-xl leading-none">{f.label}</div>
+              <div>
+                <div className={`font-display text-xl leading-none ${gold ? 'text-gold' : 'text-accent'}`}>
+                  {f.label}
+                </div>
+                <div className="mt-0.5 text-xs text-muted">{f.hint}</div>
+              </div>
             </Link>
           );
         })}
