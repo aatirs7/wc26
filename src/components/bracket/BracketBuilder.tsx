@@ -137,9 +137,11 @@ export default function BracketBuilder({ bracket, teams }: Props) {
     <div className="pb-28">
       <StickyProgressBar steps={stepInfos} activeKey={step} onSelect={(k) => setStep(k as StepKey)} />
 
-      <div className="mt-3 mb-1 flex items-center justify-between gap-2">
-        <h2 className="font-display text-3xl leading-none">{STEP_HEADINGS[step]}</h2>
-        <ClearStepButton key={step} onClear={() => dispatch({ type: 'clearStep', step })} />
+      <div className="relative mt-3 mb-1 flex items-center justify-center gap-2">
+        <h2 className="font-display text-3xl leading-none text-center">{STEP_HEADINGS[step]}</h2>
+        <div className="absolute right-0">
+          <ClearStepButton key={step} onClear={() => dispatch({ type: 'clearStep', step })} />
+        </div>
       </div>
       <Link href="/scoring" className="mb-3 inline-block text-xs font-semibold text-accent underline">
         How it&apos;s scored
