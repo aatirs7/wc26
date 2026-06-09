@@ -264,7 +264,7 @@ export default async function HomePage({
 
       {/* Quick jumps */}
       <section className="reveal space-y-3" style={{ animationDelay: '240ms' }}>
-        <h2 className="font-display text-xl text-muted">Jump to</h2>
+        <h2 className="text-center font-display text-xl text-muted">Jump to</h2>
         <div className="grid grid-cols-2 gap-3">
           {JUMPS.map((j) => {
             const Icon = j.icon;
