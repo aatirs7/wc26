@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Team } from '@/types/team';
 import type { Predictions } from '@/types/bracket';
 import {
@@ -10,7 +11,7 @@ import {
   type FillKey,
   type ResolvedMatchup,
 } from '@/lib/knockout-bracket';
-import { Trophy, ChevronRight, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Trophy, ChevronRight, ZoomIn, ZoomOut, Maximize2, X } from 'lucide-react';
 
 interface Props {
   predictions: Predictions;
@@ -121,33 +122,54 @@ interface View {
 export default function FullBracket({ predictions, teamsByCode, onPick }: Props) {
   const resolved = resolveById(predictions);
 
+  const [fs, setFs] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  // Pan/zoom state is only used inside the fullscreen overlay.
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ s: 1, x: 0, y: 0 });
-  const [dims, setDims] = useState({ w: 0, h: 0 });
+  const dimsRef = useRef({ w: 0, h: 0 });
 
-  // Pointer/gesture bookkeeping.
   const ptrs = useRef(new Map<number, { x: number; y: number }>());
   const startPt = useRef<{ x: number; y: number } | null>(null);
   const panId = useRef<number | null>(null);
   const lastPan = useRef<{ x: number; y: number } | null>(null);
   const pinch = useRef<{ dist: number; mid: { x: number; y: number } } | null>(null);
 
+  // Lock the page behind the overlay so only the bracket moves.
   useEffect(() => {
-    const el = contentRef.current;
-    if (el) setDims({ w: el.scrollWidth, h: el.scrollHeight });
-  }, [predictions]);
+    if (!fs) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [fs]);
 
-  // Keep the tree pinned inside the viewport: centre it on an axis when it is
-  // smaller than the viewport there, otherwise block dragging past the edge.
-  // This both removes stranded grey space and frees up vertical scrolling once
-  // the tree is taller than the viewport.
-  function clampView(v: View): View {
+  // Measure and fit-to-width once the overlay's content is on screen.
+  useEffect(() => {
+    if (!fs) return;
+    const el = contentRef.current;
     const vp = viewportRef.current;
-    if (!vp || !dims.w) return v;
+    if (!el || !vp) return;
+    const w = el.scrollWidth;
+    const h = el.scrollHeight;
+    dimsRef.current = { w, h };
+    const s = clampScale(Math.min(1, vp.clientWidth / w));
+    setView(clamp({ s, x: 0, y: 0 }));
+  }, [fs, predictions]);
+
+  // Keep the tree pinned inside the viewport: centre on an axis when smaller
+  // than the viewport, otherwise block dragging past the edge.
+  function clamp(v: View): View {
+    const vp = viewportRef.current;
+    const d = dimsRef.current;
+    if (!vp || !d.w) return v;
     const m = 16;
-    const cw = dims.w * v.s;
-    const ch = dims.h * v.s;
+    const cw = d.w * v.s;
+    const ch = d.h * v.s;
     let { x, y } = v;
     if (cw + 2 * m <= vp.clientWidth) x = (vp.clientWidth - cw) / 2;
     else x = Math.min(m, Math.max(vp.clientWidth - cw - m, x));
@@ -156,30 +178,16 @@ export default function FullBracket({ predictions, teamsByCode, onPick }: Props)
     return { s: v.s, x, y };
   }
 
-  // Fit to width once the tree is measured, so it fills the viewport (and is
-  // tall enough to scroll vertically) instead of opening tiny and centred.
-  const didInit = useRef(false);
-  useEffect(() => {
-    if (didInit.current || !dims.w) return;
-    const vp = viewportRef.current;
-    if (!vp) return;
-    didInit.current = true;
-    const s = clampScale(Math.min(1, vp.clientWidth / dims.w));
-    setView(clampView({ s, x: 0, y: 0 }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dims]);
-
   function vpPoint(e: React.PointerEvent): { x: number; y: number } {
     const r = viewportRef.current!.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
-  // Scale around a viewport point, keeping that point fixed.
   function zoomAround(targetScale: number, cx: number, cy: number) {
     setView((p) => {
       const s = clampScale(targetScale);
       const k = s / p.s;
-      return clampView({ s, x: cx - (cx - p.x) * k, y: cy - (cy - p.y) * k });
+      return clamp({ s, x: cx - (cx - p.x) * k, y: cy - (cy - p.y) * k });
     });
   }
 
@@ -191,15 +199,10 @@ export default function FullBracket({ predictions, teamsByCode, onPick }: Props)
 
   function fit() {
     const vp = viewportRef.current;
-    if (!vp || !dims.w) return;
-    const s = clampScale(Math.min(vp.clientWidth / dims.w, vp.clientHeight / dims.h));
-    setView(clampView({ s, x: 0, y: 0 }));
-  }
-
-  function reset() {
-    const vp = viewportRef.current;
-    const s = clampScale(vp && dims.w ? Math.min(1, vp.clientWidth / dims.w) : 1);
-    setView(clampView({ s, x: 0, y: 0 }));
+    const d = dimsRef.current;
+    if (!vp || !d.w) return;
+    const s = clampScale(Math.min(vp.clientWidth / d.w, vp.clientHeight / d.h));
+    setView(clamp({ s, x: 0, y: 0 }));
   }
 
   const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
@@ -237,7 +240,7 @@ export default function FullBracket({ predictions, teamsByCode, onPick }: Props)
       setView((prev) => {
         const s = clampScale(prev.s * k);
         const ratio = s / prev.s;
-        return clampView({ s, x: nm.x - (m0.x - prev.x) * ratio, y: nm.y - (m0.y - prev.y) * ratio });
+        return clamp({ s, x: nm.x - (m0.x - prev.x) * ratio, y: nm.y - (m0.y - prev.y) * ratio });
       });
       pinch.current = { dist: nd, mid: nm };
       return;
@@ -259,7 +262,7 @@ export default function FullBracket({ predictions, teamsByCode, onPick }: Props)
         const dx = p.x - lastPan.current.x;
         const dy = p.y - lastPan.current.y;
         lastPan.current = p;
-        setView((prev) => clampView({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+        setView((prev) => clamp({ ...prev, x: prev.x + dx, y: prev.y + dy }));
       }
     }
   }
@@ -304,69 +307,110 @@ export default function FullBracket({ predictions, teamsByCode, onPick }: Props)
   const champCode = resolved.get(ROOT_ID)?.winner ?? null;
   const champ = champCode ? teamsByCode.get(champCode) : undefined;
 
+  const champBox = (
+    <div
+      className={`flex w-40 shrink-0 flex-col items-center gap-1 rounded-lg border p-3 text-center ${
+        champ ? 'border-gold/50 bg-gold/[0.08] ring-1' : 'border-edge bg-surface'
+      }`}
+    >
+      <Trophy className={`h-6 w-6 ${champ ? 'text-gold' : 'text-muted-2'}`} strokeWidth={2} />
+      {champ ? (
+        <>
+          <span className="text-2xl leading-none">{champ.flag}</span>
+          <span className="text-sm font-bold leading-tight">{champ.name}</span>
+          <span className="text-[0.55rem] font-bold uppercase tracking-wider text-gold">Champion</span>
+        </>
+      ) : (
+        <span className="text-[0.65rem] font-medium leading-tight text-muted-2">Champion</span>
+      )}
+    </div>
+  );
+
   const zoomBtn =
-    'flex h-8 w-8 items-center justify-center rounded-lg border border-edge bg-white/[0.03] text-muted active:scale-90';
+    'flex h-9 w-9 items-center justify-center rounded-lg border border-edge bg-white/[0.03] text-muted active:scale-90';
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-1.5">
-        <span className="text-[0.65rem] text-muted-2">Pinch to zoom · drag to move</span>
-        <div className="flex items-center gap-1.5">
-          <button type="button" aria-label="Zoom out" onClick={() => zoomByCenter(1 / 1.25)} className={zoomBtn}>
-            <ZoomOut className="h-4 w-4" strokeWidth={2.2} />
-          </button>
-          <button type="button" onClick={fit} className="flex h-8 items-center gap-1 rounded-lg border border-edge bg-white/[0.03] px-2.5 text-xs font-semibold text-muted active:scale-90">
-            <Maximize2 className="h-3.5 w-3.5" strokeWidth={2.2} />
-            Fit
-          </button>
-          <button type="button" onClick={reset} className="flex h-8 items-center rounded-lg border border-edge bg-white/[0.03] px-2.5 text-xs font-semibold text-muted active:scale-90">
-            1×
-          </button>
-          <button type="button" aria-label="Zoom in" onClick={() => zoomByCenter(1.25)} className={zoomBtn}>
-            <ZoomIn className="h-4 w-4" strokeWidth={2.2} />
-          </button>
+      {/* Inline: the tree scrolls horizontally on its own, the page scrolls
+          vertically, and tapping a team still picks a winner. */}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[0.65rem] text-muted-2">Swipe sideways to follow it</span>
+        <button
+          type="button"
+          onClick={() => setFs(true)}
+          className="flex h-9 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 text-xs font-bold text-accent active:scale-95"
+        >
+          <Maximize2 className="h-3.5 w-3.5" strokeWidth={2.4} />
+          Fullscreen
+        </button>
+      </div>
+
+      <div className="-mx-4 overflow-x-auto px-4 pb-2">
+        <div className="flex w-max items-center py-1">
+          <Node id={ROOT_ID} />
+          <Connector />
+          {champBox}
         </div>
       </div>
 
-      <div
-        ref={viewportRef}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        className="-mx-4 h-[78vh] touch-none select-none overflow-hidden rounded-xl border border-edge/60 bg-black/10"
-      >
-        <div
-          ref={contentRef}
-          data-fullbracket
-          className="flex w-max items-center p-3"
-          style={{
-            transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})`,
-            transformOrigin: '0 0',
-          }}
-        >
-          <Node id={ROOT_ID} />
-          <Connector />
-          <div
-            className={`flex w-40 shrink-0 flex-col items-center gap-1 rounded-lg border p-3 text-center ${
-              champ ? 'border-gold/50 bg-gold/[0.08] ring-1' : 'border-edge bg-surface'
-            }`}
-          >
-            <Trophy className={`h-6 w-6 ${champ ? 'text-gold' : 'text-muted-2'}`} strokeWidth={2} />
-            {champ ? (
-              <>
-                <span className="text-2xl leading-none">{champ.flag}</span>
-                <span className="text-sm font-bold leading-tight">{champ.name}</span>
-                <span className="text-[0.55rem] font-bold uppercase tracking-wider text-gold">
-                  Champion
-                </span>
-              </>
-            ) : (
-              <span className="text-[0.65rem] font-medium leading-tight text-muted-2">Champion</span>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Fullscreen: an immersive pinch/zoom/drag canvas. */}
+      {fs && mounted
+        ? createPortal(
+            <div className="fixed inset-0 z-[90] flex flex-col bg-bg">
+              <div className="flex items-center justify-between gap-1.5 px-3 pb-2 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+                <span className="text-[0.65rem] text-muted-2">Pinch to zoom · drag to move</span>
+                <div className="flex items-center gap-1.5">
+                  <button type="button" aria-label="Zoom out" onClick={() => zoomByCenter(1 / 1.25)} className={zoomBtn}>
+                    <ZoomOut className="h-4 w-4" strokeWidth={2.2} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fit}
+                    className="flex h-9 items-center gap-1 rounded-lg border border-edge bg-white/[0.03] px-2.5 text-xs font-semibold text-muted active:scale-90"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" strokeWidth={2.2} />
+                    Fit
+                  </button>
+                  <button type="button" aria-label="Zoom in" onClick={() => zoomByCenter(1.25)} className={zoomBtn}>
+                    <ZoomIn className="h-4 w-4" strokeWidth={2.2} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFs(false)}
+                    className="flex h-9 items-center gap-1 rounded-lg bg-accent px-3 text-xs font-bold text-[var(--accent-ink)] active:scale-90"
+                  >
+                    <X className="h-4 w-4" strokeWidth={2.4} />
+                    Exit
+                  </button>
+                </div>
+              </div>
+
+              <div
+                ref={viewportRef}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
+                className="relative flex-1 touch-none select-none overflow-hidden"
+              >
+                <div
+                  ref={contentRef}
+                  data-fullbracket
+                  className="flex w-max items-center p-3"
+                  style={{
+                    transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})`,
+                    transformOrigin: '0 0',
+                  }}
+                >
+                  <Node id={ROOT_ID} />
+                  <Connector />
+                  {champBox}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

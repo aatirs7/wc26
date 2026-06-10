@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import Link from 'next/link';
 import { AlertTriangle } from 'lucide-react';
 import type { Team } from '@/types/team';
 import type { Predictions } from '@/types/bracket';
@@ -147,10 +146,6 @@ export default function BracketBuilder({ bracket, teams }: Props) {
           <ClearStepButton key={step} onClear={() => dispatch({ type: 'clearStep', step })} />
         </div>
       </div>
-      <Link href="/scoring" className="mb-3 inline-block text-xs font-semibold text-accent underline">
-        How it&apos;s scored
-      </Link>
-
       {error ? (
         <p className="mb-3 rounded-xl border border-live/40 bg-live/[0.08] p-3 text-sm text-live">
           {error}
