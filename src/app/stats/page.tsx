@@ -1,31 +1,34 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { brackets, groupStandings, matches, poolMembers, users } from '@/lib/schema';
+import { brackets, bracketScores, groupStandings, matches, poolMembers, teams, users } from '@/lib/schema';
 import { currentUserId } from '@/lib/auth';
-import { cohortOf, familyOf, FAMILIES, type Cohort } from '@/lib/cohorts';
+import { cohortOf, familyOf, FAMILIES } from '@/lib/cohorts';
 import { attainablePoints, buildFacts } from '@/lib/scoring';
-import MemberList, { type Member } from '@/components/stats/MemberList';
+import { GROUP_LETTERS, type RoundKey } from '@/lib/constants';
+import type { Predictions } from '@/types/bracket';
+import { type Member } from '@/components/stats/MemberList';
+import StatsTabs from '@/components/stats/StatsTabs';
+import HeadToHeadStats, { type CohortView } from '@/components/stats/HeadToHeadStats';
+import GroupStats from '@/components/stats/GroupStats';
 
 export const dynamic = 'force-dynamic';
 
-interface CohortStats {
-  label: string;
-  players: number;
-  submitted: number;
-  totalPoints: number;
-  avgPoints: number;
-  accuracy: number | null;
-  leaderName: string | null;
-  leaderPoints: number;
-}
+const ROUND_LABELS: Record<RoundKey, string> = {
+  groups: 'Group finishes',
+  thirdPlace: 'Best thirds',
+  r16: 'Round of 16',
+  qf: 'Quarter-finals',
+  sf: 'Semi-finals',
+  final: 'Final',
+  champion: 'Champion',
+};
 
 function summarize(
   label: string,
   rows: { name: string; points: number; submitted: boolean }[],
   attainable: number,
-): CohortStats {
+): CohortView['stats'] {
   const totalPoints = rows.reduce((s, r) => s + r.points, 0);
   const submitted = rows.filter((r) => r.submitted).length;
   const leader = rows.slice().sort((a, b) => b.points - a.points)[0];
@@ -59,13 +62,14 @@ export default async function StatsPage() {
   }
 
   const members = await db
-    .select({ name: users.displayName, clerkId: poolMembers.userId })
+    .select({ name: users.displayName, userId: poolMembers.userId })
     .from(poolMembers)
     .innerJoin(users, eq(users.id, poolMembers.userId))
     .where(eq(poolMembers.poolId, poolId));
 
   const poolBrackets = await db.select().from(brackets).where(eq(brackets.poolId, poolId));
   const byOwner = new Map(poolBrackets.map((b) => [b.ownerId, b]));
+  const ownerName = new Map(members.map((m) => [m.userId, m.name]));
 
   // Accuracy denominator: max points a perfect bracket could hold so far.
   const matchRows = await db
@@ -89,12 +93,12 @@ export default async function StatsPage() {
   const accuracyOf = (points: number) =>
     attainable > 0 ? Math.round((points / attainable) * 100) : null;
 
-  const myName = members.find((m) => m.clerkId === userId)?.name ?? null;
+  const myName = members.find((m) => m.userId === userId)?.name ?? null;
   const myCohort = myName ? cohortOf(myName) : null;
   const myFamily = myName ? familyOf(myName) : null;
 
   const rows = members.map((m) => {
-    const b = byOwner.get(m.clerkId);
+    const b = byOwner.get(m.userId);
     return {
       name: m.name,
       cohort: cohortOf(m.name),
@@ -110,21 +114,21 @@ export default async function StatsPage() {
     accuracy: accuracyOf(r.points),
   });
 
-  const adults = summarize('Adults', rows.filter((r) => r.cohort === 'adults'), attainable);
-  const kids = summarize('Kids', rows.filter((r) => r.cohort === 'kids'), attainable);
+  // ---- Head to head: cohorts and families ----
+  const adultRows = rows.filter((r) => r.cohort === 'adults');
+  const kidRows = rows.filter((r) => r.cohort === 'kids');
+  const adults = summarize('Adults', adultRows, attainable);
+  const kids = summarize('Kids', kidRows, attainable);
 
-  const cohorts: { c: Cohort; s: CohortStats; accent: string; members: Member[] }[] = [
-    { c: 'adults', s: adults, accent: 'text-gold', members: rows.filter((r) => r.cohort === 'adults').map(toMember) },
-    { c: 'kids', s: kids, accent: 'text-accent', members: rows.filter((r) => r.cohort === 'kids').map(toMember) },
+  const cohorts: CohortView[] = [
+    { key: 'adults', accent: 'text-gold', isMe: myCohort === 'adults', stats: adults, members: adultRows.map(toMember) },
+    { key: 'kids', accent: 'text-accent', isMe: myCohort === 'kids', stats: kids, members: kidRows.map(toMember) },
   ];
 
-  // Who is ahead, by average points per player (fairer than total since
-  // the cohorts are different sizes).
   let banner = 'Dead level so far';
   if (adults.avgPoints > kids.avgPoints) banner = 'Adults are ahead';
   else if (kids.avgPoints > adults.avgPoints) banner = 'Kids are ahead';
 
-  // Families: ranked by accuracy (fair across different household sizes).
   const families = FAMILIES.map((f) => {
     const fam = rows.filter((r) => r.family === f.name);
     const totalPoints = fam.reduce((s, r) => s + r.points, 0);
@@ -132,162 +136,155 @@ export default async function StatsPage() {
       attainable > 0 && fam.length
         ? Math.round((totalPoints / (attainable * fam.length)) * 100)
         : null;
-    return { name: f.name, count: fam.length, totalPoints, accuracy, members: fam.map(toMember) };
+    return {
+      name: f.name,
+      count: fam.length,
+      totalPoints,
+      accuracy,
+      isMe: f.name === myFamily,
+      members: fam.map(toMember),
+    };
   }).sort((a, b) => (b.accuracy ?? -1) - (a.accuracy ?? -1) || b.totalPoints - a.totalPoints);
 
-  const topOverall = rows.slice().sort((a, b) => b.points - a.points).slice(0, 5);
+  const h2hTop = rows
+    .slice()
+    .sort((a, b) => b.points - a.points)
+    .slice(0, 5)
+    .map((r) => ({
+      name: r.name,
+      cohort: r.cohort,
+      points: r.points,
+      accuracy: accuracyOf(r.points),
+      isMe: r.name === myName,
+    }));
   const anyPoints = rows.some((r) => r.points > 0);
 
+  // ---- Group stats: what the group is picking ----
+  const teamRows = await db.select({ code: teams.code, name: teams.name, flag: teams.flag }).from(teams);
+  const teamByCode = new Map(teamRows.map((t) => [t.code, t]));
+  const label = (code: string) => ({
+    name: teamByCode.get(code)?.name ?? code,
+    flag: teamByCode.get(code)?.flag ?? '',
+  });
+
+  const scoreRows = poolBrackets.length
+    ? await db
+        .select()
+        .from(bracketScores)
+        .where(inArray(bracketScores.bracketId, poolBrackets.map((b) => b.id)))
+    : [];
+
+  const predOf = (ownerId: string) => byOwner.get(ownerId)?.predictions as Predictions | undefined;
+
+  const players = rows.length;
+  const submittedCount = rows.filter((r) => r.submitted).length;
+  const totalPoints = rows.reduce((s, r) => s + r.points, 0);
+  const avgPoints = players ? Math.round((totalPoints / players) * 10) / 10 : 0;
+  const poolAccuracy =
+    attainable > 0 && players ? Math.round((totalPoints / (attainable * players)) * 100) : null;
+  const allMembers = rows.map(toMember);
+
+  // Champion picks across the group.
+  const champCount = new Map<string, number>();
+  const champOwner = new Map<string, string[]>();
+  for (const b of poolBrackets) {
+    const c = (b.predictions as Predictions).knockout?.champion;
+    if (!c) continue;
+    champCount.set(c, (champCount.get(c) ?? 0) + 1);
+    const arr = champOwner.get(c) ?? [];
+    arr.push(ownerName.get(b.ownerId) ?? '?');
+    champOwner.set(c, arr);
+  }
+  const myChampion = predOf(userId)?.knockout?.champion ?? null;
+  const championPicks = [...champCount.entries()]
+    .map(([code, count]) => ({ code, count, ...label(code), mine: code === myChampion }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+  const maxChampion = championPicks[0]?.count ?? 0;
+
+  // Teams the group backs to reach the Final.
+  const finalCount = new Map<string, number>();
+  for (const b of poolBrackets) {
+    for (const code of (b.predictions as Predictions).knockout?.final ?? []) {
+      finalCount.set(code, (finalCount.get(code) ?? 0) + 1);
+    }
+  }
+  const finalistPicks = [...finalCount.entries()]
+    .map(([code, count]) => ({ code, count, ...label(code) }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+  const maxFinalist = finalistPicks[0]?.count ?? 0;
+
+  // Consensus group winner: most-picked 1st place in each group.
+  const groupWinners = GROUP_LETTERS.map((letter) => {
+    const counts = new Map<string, number>();
+    let total = 0;
+    for (const b of poolBrackets) {
+      const first = (b.predictions as Predictions).groups?.[letter]?.first;
+      if (first) {
+        counts.set(first, (counts.get(first) ?? 0) + 1);
+        total += 1;
+      }
+    }
+    if (total === 0) return null;
+    const [topCode, n] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    return { letter, ...label(topCode), pct: Math.round((n / total) * 100) };
+  }).filter((g): g is NonNullable<typeof g> => g !== null);
+
+  // Lone-wolf champion picks (backed by exactly one player).
+  const loneWolves = [...champCount.entries()]
+    .filter(([, count]) => count === 1)
+    .map(([code]) => ({ owner: champOwner.get(code)?.[0] ?? '?', ...label(code) }));
+
+  const groupTop = rows
+    .slice()
+    .sort((a, b) => b.points - a.points)
+    .slice(0, 8)
+    .map((r) => ({ name: r.name, points: r.points, accuracy: accuracyOf(r.points) }));
+
+  const roundPoints = new Map<RoundKey, number>();
+  for (const s of scoreRows) {
+    roundPoints.set(s.roundKey as RoundKey, (roundPoints.get(s.roundKey as RoundKey) ?? 0) + s.points);
+  }
+  const roundBreakdown = [...roundPoints.entries()]
+    .filter(([, pts]) => pts > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, pts]) => ({ label: ROUND_LABELS[key], pts }));
+
   return (
-    <div className="space-y-5 py-4">
-      <header className="pt-2 text-center">
-        <h1 className="font-display text-4xl leading-none">Adults vs Kids</h1>
-        <p className="mt-1 text-sm text-muted">
-          Family bragging rights ·{' '}
-          <Link href="/scoring" className="font-semibold text-accent underline">
-            How it&apos;s scored
-          </Link>
-        </p>
-      </header>
-
-      <div className="card p-4 text-center">
-        <div className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-muted">
-          Standing
-        </div>
-        <div className="shine mt-1 font-display text-3xl">{banner}</div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        {cohorts.map(({ c, s, accent, members: cohortMembers }) => (
-          <div key={c} className={`card space-y-3 p-4 ${c === myCohort ? 'border-accent' : ''}`}>
-            <h2 className={`flex items-center justify-center gap-1.5 font-display text-2xl leading-none ${accent}`}>
-              {s.label}
-              {c === myCohort ? (
-                <span className="rounded-full bg-accent px-1.5 py-0.5 text-[0.5rem] font-bold uppercase tracking-wider text-[var(--accent-ink)]">
-                  You
-                </span>
-              ) : null}
-            </h2>
-            <div className="flex items-end gap-4">
-              <div>
-                <div className="font-display text-4xl leading-none">{s.avgPoints}</div>
-                <div className="text-[0.65rem] font-bold uppercase tracking-wider text-muted">
-                  avg pts
-                </div>
-              </div>
-              <div>
-                <div className="font-display text-4xl leading-none">
-                  {s.accuracy === null ? '—' : `${s.accuracy}%`}
-                </div>
-                <div className="text-[0.65rem] font-bold uppercase tracking-wider text-muted">
-                  accuracy
-                </div>
-              </div>
-            </div>
-            <dl className="space-y-1 text-xs text-muted">
-              <div className="flex justify-between">
-                <dt>Players</dt>
-                <dd className="font-semibold text-foreground">{s.players}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt>Locked in</dt>
-                <dd className="font-semibold text-foreground">
-                  {s.submitted}/{s.players}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt>Total pts</dt>
-                <dd className="font-semibold text-foreground">{s.totalPoints}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt>Leader</dt>
-                <dd className="truncate pl-2 font-semibold text-foreground">
-                  {s.leaderName ? `${s.leaderName} (${s.leaderPoints})` : '—'}
-                </dd>
-              </div>
-            </dl>
-            <MemberList members={cohortMembers} highlight={myName ?? undefined} />
-          </div>
-        ))}
-      </div>
-
-      <section>
-        <h2 className="mb-2 text-center font-display text-2xl">Family vs Family</h2>
-        <p className="mb-3 text-center text-xs text-muted">
-          Ranked by accuracy, so household size doesn&apos;t matter.
-        </p>
-        <ol className="space-y-2">
-          {families.map((f, i) => (
-            <li key={f.name} className={`card p-3 ${f.name === myFamily ? 'border-accent' : ''}`}>
-              <div className="flex items-center gap-3">
-                <span className="w-5 text-center font-display text-lg text-muted">{i + 1}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate font-display text-lg leading-tight">{f.name}</span>
-                    {f.name === myFamily ? (
-                      <span className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[0.5rem] font-bold uppercase tracking-wider text-[var(--accent-ink)]">
-                        You
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="text-xs text-muted">{f.count} players · {f.totalPoints} pts</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-display text-2xl leading-none text-accent">
-                    {f.accuracy === null ? '—' : `${f.accuracy}%`}
-                  </div>
-                  <div className="text-[0.6rem] font-bold uppercase tracking-wider text-muted">
-                    accuracy
-                  </div>
-                </div>
-              </div>
-              <div className="mt-2 border-t border-edge/50 pt-1">
-                <MemberList members={f.members} highlight={myName ?? undefined} />
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section>
-        <h3 className="mb-2 text-center font-display text-xl text-muted">Top of the family</h3>
-        {anyPoints ? (
-          <ol className="space-y-2">
-            {topOverall.map((r, i) => (
-              <li
-                key={r.name}
-                className={`card flex items-center gap-3 px-3 py-2.5 ${
-                  r.name === myName ? 'border-accent bg-accent/[0.06]' : ''
-                }`}
-              >
-                <span className="w-5 text-center font-display text-lg text-muted">{i + 1}</span>
-                <span className="flex-1 truncate text-sm font-bold">
-                  {r.name}
-                  {r.name === myName ? (
-                    <span className="ml-1.5 text-[0.6rem] font-bold uppercase text-accent">You</span>
-                  ) : null}
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wider ${
-                    r.cohort === 'adults' ? 'bg-gold/15 text-gold' : 'bg-accent/15 text-accent'
-                  }`}
-                >
-                  {r.cohort}
-                </span>
-                {accuracyOf(r.points) !== null ? (
-                  <span className="text-xs font-semibold text-muted">{accuracyOf(r.points)}%</span>
-                ) : null}
-                <span className="font-display text-xl text-accent">{r.points}</span>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="card p-4 text-sm text-muted">
-            No points yet. Once the tournament kicks off, accuracy and points
-            land here round by round.
-          </p>
-        )}
-      </section>
+    <div className="py-4">
+      <StatsTabs
+        headToHead={
+          <HeadToHeadStats
+            banner={banner}
+            cohorts={cohorts}
+            families={families}
+            top={h2hTop}
+            anyPoints={anyPoints}
+            myName={myName}
+          />
+        }
+        group={
+          <GroupStats
+            poolEmpty={poolBrackets.length === 0}
+            avgPoints={avgPoints}
+            poolAccuracy={poolAccuracy}
+            submitted={submittedCount}
+            players={players}
+            allMembers={allMembers}
+            myName={myName}
+            championPicks={championPicks}
+            maxChampion={maxChampion}
+            finalistPicks={finalistPicks}
+            maxFinalist={maxFinalist}
+            groupWinners={groupWinners}
+            loneWolves={loneWolves}
+            top={groupTop}
+            anyPoints={anyPoints}
+            roundBreakdown={roundBreakdown}
+          />
+        }
+      />
     </div>
   );
 }
