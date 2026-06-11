@@ -21,6 +21,14 @@ const body = Hanken_Grotesk({
 export const metadata: Metadata = {
   title: 'WC26 Bracket Pool',
   description: 'World Cup 2026 bracket pool with friends',
+  manifest: '/manifest.webmanifest',
+  // iOS "Add to Home Screen": launch standalone with the Siddiqui WC26 name.
+  // The icon itself comes from src/app/apple-icon.png.
+  appleWebApp: {
+    capable: true,
+    title: 'Siddiqui WC26',
+    statusBarStyle: 'black-translucent',
+  },
 };
 
 export const viewport: Viewport = {
