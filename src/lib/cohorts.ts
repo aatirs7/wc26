@@ -17,7 +17,7 @@ export function cohortOf(displayName: string): Cohort {
 // The five family households. Named by the parents.
 export const FAMILIES: { name: string; members: string[] }[] = [
   { name: 'Adeel & Wajiha', members: ['Aatir', 'Aashir', 'Abeer', 'Ammaar', 'Wajiha', 'Adeel'] },
-  { name: 'Afif & Farheen', members: ['Alyaan', 'Aakif', 'Aarij', 'Afif', 'Farheen', 'Urisha', 'Ayra'] },
+  { name: 'Afif & Farheen', members: ['Alyaan', 'Aakif', 'Aarij', 'Afif', 'Farheen', 'Urisha', 'Ayra', 'Aayra'] },
   { name: 'Arees & Nida', members: ['Aafi', 'Aali', 'Alena', 'Aleza', 'Arees', 'Nida'] },
   { name: 'Adnan & Madiha', members: ['Rayyan', 'Mustafa', 'Manahil', 'Rameen', 'Muniza', 'Adnan', 'Madiha'] },
   { name: 'Daadi & Aazim', members: ['Daadi', 'Aazim'] },
