@@ -123,6 +123,7 @@ export default function HeadToHeadStats({
         ))}
       </div>
 
+      <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0">
       <section>
         <h2 className="mb-2 text-center font-display text-2xl">Family vs Family</h2>
         <p className="mb-3 text-center text-xs text-muted">
@@ -202,6 +203,7 @@ export default function HeadToHeadStats({
           </p>
         )}
       </section>
+      </div>
     </div>
   );
 }

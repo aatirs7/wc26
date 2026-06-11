@@ -159,7 +159,7 @@ export default function GroupStats(props: GroupStatsProps) {
       {finalistPicks.length > 0 ? (
         <section>
           <h2 className="mb-2 text-center font-display text-2xl">Backed to reach the final</h2>
-          <ul className="grid grid-cols-2 gap-2">
+          <ul className="grid grid-cols-2 gap-2 lg:grid-cols-3">
             {finalistPicks.map((f) => (
               <li key={f.code} className="card flex items-center gap-2 p-2.5">
                 <span className="text-xl leading-none">{f.flag}</span>
@@ -179,7 +179,7 @@ export default function GroupStats(props: GroupStatsProps) {
       {groupWinners.length > 0 ? (
         <section>
           <h2 className="mb-2 text-center font-display text-2xl">Consensus group winners</h2>
-          <ul className="grid grid-cols-2 gap-2">
+          <ul className="grid grid-cols-2 gap-2 lg:grid-cols-3">
             {groupWinners.map((g) => (
               <li key={g.letter} className="card flex items-center gap-2 p-2.5">
                 <span className="font-display text-base text-muted">{g.letter}</span>

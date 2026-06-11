@@ -11,15 +11,17 @@ import {
   Lock,
   Timer,
   ArrowRight,
+  Radio,
   type LucideIcon,
 } from 'lucide-react';
 import { db } from '@/lib/db';
-import { brackets, bracketScores, poolMembers, pools, users } from '@/lib/schema';
+import { brackets, bracketScores, poolMembers, pools, standingSnapshots, users } from '@/lib/schema';
 import { currentUserId } from '@/lib/auth';
 import { isLocked, kickoffUtc } from '@/lib/lock';
 import { isComplete } from '@/lib/predictions';
 import { DISPLAY_TZ_LABEL, matchDayLabel, matchTime } from '@/lib/format-time';
 import Countdown from '@/components/home/Countdown';
+import DailyRecap, { type RecapData } from '@/components/home/DailyRecap';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +80,7 @@ export default async function HomePage({
   let myBracket:
     | { id: string; name: string; submitted: boolean; points: number; complete: boolean }
     | null = null;
+  let recap: RecapData = { climber: null, faller: null, gainer: null, you: null };
 
   if (active) {
     const members = await db
@@ -123,11 +126,56 @@ export default async function HomePage({
       return a.lockedAtMs - b.lockedAtMs;
     });
     let rank = 0;
+    const curRank = new Map<string, number>();
+    const curPoints = new Map<string, number>();
     for (const r of rows) {
+      curPoints.set(r.ownerId, r.points);
       if (r.submitted) {
         rank += 1;
+        curRank.set(r.ownerId, rank);
         if (r.ownerId === userId) myRank = rank;
       }
+    }
+
+    // Daily recap: movement since the morning snapshot. Only meaningful once
+    // games are scoring; before kickoff "movement" is just submissions
+    // reshuffling the order, which reads as noise.
+    const snaps = await db
+      .select({ userId: standingSnapshots.userId, points: standingSnapshots.points, rank: standingSnapshots.rank })
+      .from(standingSnapshots)
+      .where(eq(standingSnapshots.poolId, active.poolId));
+    if (locked && snaps.length > 0) {
+      const nameRows = await db
+        .select({ id: users.id, name: users.displayName })
+        .from(users)
+        .where(inArray(users.id, members.map((m) => m.userId)));
+      const nameByUser = new Map(nameRows.map((n) => [n.id, n.name]));
+
+      let climber: RecapData['climber'] = null;
+      let faller: RecapData['faller'] = null;
+      let gainer: RecapData['gainer'] = null;
+      for (const s of snaps) {
+        if (s.userId === userId) continue; // the "you" line already covers the viewer
+        const name = nameByUser.get(s.userId) ?? '?';
+        const nowRank = curRank.get(s.userId);
+        const gained = (curPoints.get(s.userId) ?? 0) - s.points;
+        if (s.rank != null && nowRank != null) {
+          const up = s.rank - nowRank;
+          if (up > 0 && (!climber || up > climber.up)) climber = { name, up };
+          if (up < 0 && (!faller || -up > faller.down)) faller = { name, down: -up };
+        }
+        if (gained > 0 && (!gainer || gained > gainer.pts)) gainer = { name, pts: gained };
+      }
+      const mySnap = snaps.find((s) => s.userId === userId);
+      const you =
+        mySnap && myRank != null
+          ? {
+              rankDelta: mySnap.rank != null ? mySnap.rank - myRank : 0,
+              gained: (curPoints.get(userId) ?? 0) - mySnap.points,
+              rank: myRank,
+            }
+          : null;
+      recap = { climber, faller, gainer, you };
     }
 
     const mine = bracketByOwner.get(userId);
@@ -152,7 +200,7 @@ export default async function HomePage({
       : 'View your bracket';
 
   return (
-    <div className="space-y-6 py-4">
+    <div className="space-y-6 py-4 lg:mx-auto lg:max-w-5xl lg:space-y-8 lg:pt-2">
       <header className="reveal flex flex-col items-center gap-2 pt-2 text-center">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent font-display text-2xl text-[var(--accent-ink)]">
           {(me?.displayName ?? 'Y').slice(0, 1).toUpperCase()}
@@ -167,6 +215,8 @@ export default async function HomePage({
         </div>
       </header>
 
+      <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
+      <div className="space-y-6">
       {/* Kickoff / lock banner */}
       <section
         className="reveal card space-y-3 p-4 text-center"
@@ -192,6 +242,22 @@ export default async function HomePage({
           </>
         )}
       </section>
+
+      {/* Match Day live hub */}
+      <Link
+        href="/live"
+        className="reveal flex items-center gap-3 rounded-[1.1rem] border border-live/40 bg-live/[0.1] p-4 active:scale-[0.99]"
+        style={{ animationDelay: '100ms' }}
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-live/15 ring-1 ring-live/40">
+          <Radio className="h-5 w-5 text-live" strokeWidth={2.2} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-xl leading-none text-live">Match Day</div>
+          <div className="mt-0.5 text-xs text-muted">Live scores, your picks & next kickoff</div>
+        </div>
+        <ArrowRight className="h-4 w-4 shrink-0 text-live" />
+      </Link>
 
       {/* Overview: rank + points */}
       <section className="reveal grid grid-cols-2 gap-3" style={{ animationDelay: '120ms' }}>
@@ -225,11 +291,16 @@ export default async function HomePage({
         </div>
       </section>
 
+      {/* Daily recap (self-hides until there is movement) */}
+      <DailyRecap data={recap} />
+      </div>
+
+      <div className="space-y-6">
       {/* Bracket status headline */}
       <section className="reveal" style={{ animationDelay: '180ms' }}>
         <Link
           href="/bracket"
-          className="card flex items-center gap-3 p-4 active:scale-[0.99]"
+          className="card flex items-center gap-3 p-4 active:scale-[0.99] lg:transition-all lg:hover:-translate-y-0.5 lg:hover:border-edge-strong"
         >
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/10 ring-1 ring-accent/30">
             <Trophy className="h-5 w-5 text-accent" />
@@ -255,7 +326,7 @@ export default async function HomePage({
             <Link
               key={f.href}
               href={f.href}
-              className={`card flex flex-col items-center gap-2 p-4 text-center shadow-lg active:scale-[0.98] ${
+              className={`card flex flex-col items-center gap-2 p-4 text-center shadow-lg active:scale-[0.98] lg:transition-transform lg:hover:-translate-y-0.5 ${
                 gold
                   ? 'border-gold/50 bg-gold/[0.14] shadow-gold/20'
                   : 'border-accent/50 bg-accent/[0.14] shadow-accent/20'
@@ -289,7 +360,7 @@ export default async function HomePage({
               <Link
                 key={j.href}
                 href={j.href}
-                className="card flex flex-col items-center gap-2 p-4 text-center active:scale-[0.98]"
+                className="card flex flex-col items-center gap-2 p-4 text-center active:scale-[0.98] lg:transition-all lg:hover:-translate-y-0.5 lg:hover:border-edge-strong"
               >
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.04] ring-1 ring-edge">
                   <Icon className="h-5 w-5 text-accent" strokeWidth={2.2} />
@@ -303,6 +374,8 @@ export default async function HomePage({
           })}
         </div>
       </section>
+      </div>
+      </div>
     </div>
   );
 }

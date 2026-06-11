@@ -252,7 +252,7 @@ export default async function StatsPage() {
     .map(([key, pts]) => ({ label: ROUND_LABELS[key], pts }));
 
   return (
-    <div className="py-4">
+    <div className="py-4 lg:mx-auto lg:max-w-4xl">
       <StatsTabs
         headToHead={
           <HeadToHeadStats
