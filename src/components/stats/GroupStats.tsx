@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import MemberList, { type Member } from './MemberList';
 
 export interface TeamCount {
@@ -81,12 +80,7 @@ export default function GroupStats(props: GroupStatsProps) {
     <div className="space-y-5">
       <header className="text-center">
         <h1 className="font-display text-4xl leading-none">Group Stats</h1>
-        <p className="mt-1 text-sm text-muted">
-          What everyone is picking ·{' '}
-          <Link href="/scoring" className="font-semibold text-accent underline">
-            How it&apos;s scored
-          </Link>
-        </p>
+        <p className="mt-1 text-sm text-muted">What everyone is picking</p>
       </header>
 
       {poolEmpty ? (
