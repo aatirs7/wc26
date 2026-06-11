@@ -54,8 +54,8 @@ export default function HeadToHeadStats({
     <div className="space-y-5">
       <header className="text-center">
         <h1 className="font-display text-4xl leading-none">Adults vs Kids</h1>
-        <p className="mt-1 text-sm text-muted">
-          Family bragging rights ·{' '}
+        <p className="mt-1 text-sm text-muted">Family bragging rights</p>
+        <p className="mt-0.5 text-xs text-muted">
           <Link href="/scoring" className="font-semibold text-accent underline">
             How it&apos;s scored
           </Link>
