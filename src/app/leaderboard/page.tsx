@@ -218,6 +218,9 @@ export default async function LeaderboardPage({
   return (
     <div className="space-y-4 py-4 lg:mx-auto lg:max-w-2xl">
       <PullToRefresh />
+      <p className="-mt-2 flex items-center justify-center gap-1 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-muted-2 lg:hidden">
+        ↓ Pull to refresh
+      </p>
       <header className="pt-2 text-center">
         <h1 className="font-display text-4xl leading-none">Standings</h1>
         <p className="mt-1 text-xs text-muted">Bracket + score-prediction bonus</p>
