@@ -235,11 +235,14 @@ export default function BracketBuilder({ bracket, teams }: Props) {
         )}
       </div>
 
+      {/* Once the bracket is complete the submit button shows on every step,
+          so a change made on the groups or thirds tab can still be
+          re-submitted without hunting for the knockout view. */}
       <SaveSubmitBar
         saveStatus={saveStatus}
         canNext={stepIndex < STEP_ORDER.length - 1}
         onNext={() => setStep(STEP_ORDER[stepIndex + 1])}
-        showSubmit={step === 'knockout'}
+        showSubmit={complete || step === 'knockout'}
         submitEnabled={complete}
         submitted={submitted}
         submitting={submitting}
