@@ -252,7 +252,7 @@ export default async function HomePage({
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-live/15 ring-1 ring-live/40">
           <Radio className="h-5 w-5 text-live" strokeWidth={2.2} />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 text-center">
           <div className="font-display text-xl leading-none text-live">Match Day</div>
           <div className="mt-0.5 text-xs text-muted">Live scores, your picks & next kickoff</div>
         </div>
@@ -326,7 +326,7 @@ export default async function HomePage({
             <Link
               key={f.href}
               href={f.href}
-              className={`card flex flex-col items-center gap-2 p-4 text-center shadow-lg active:scale-[0.98] lg:transition-transform lg:hover:-translate-y-0.5 ${
+              className={`card ${gold ? 'shine-sweep' : 'shine-sweep-2'} flex flex-col items-center gap-2 p-4 text-center shadow-lg active:scale-[0.98] lg:transition-transform lg:hover:-translate-y-0.5 ${
                 gold
                   ? 'border-gold/50 bg-gold/[0.14] shadow-gold/20'
                   : 'border-accent/50 bg-accent/[0.14] shadow-accent/20'
