@@ -22,6 +22,7 @@ export interface FamilyView {
   name: string;
   count: number;
   totalPoints: number;
+  avgPoints: number;
   accuracy: number | null;
   isMe: boolean;
   members: Member[];
@@ -144,7 +145,7 @@ export default function HeadToHeadStats({
                     ) : null}
                   </div>
                   <div className="text-xs text-muted">
-                    {f.count} players · {f.totalPoints} pts
+                    {f.count} {f.count === 1 ? 'player' : 'players'} · {f.avgPoints} avg pts
                   </div>
                 </div>
                 <div className="text-right">

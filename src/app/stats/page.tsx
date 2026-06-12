@@ -78,6 +78,12 @@ export default async function StatsPage() {
       status: matches.status,
       groupLetter: matches.groupLetter,
       winnerCode: matches.winnerCode,
+      // Scores are required so buildFacts can compute the live group tables;
+      // without them attainable (and accuracy) would read 0.
+      homeCode: matches.homeCode,
+      awayCode: matches.awayCode,
+      homeScore: matches.homeScore,
+      awayScore: matches.awayScore,
     })
     .from(matches);
   const standingRows = await db
@@ -136,6 +142,9 @@ export default async function StatsPage() {
   const families = FAMILIES.map((f) => {
     const fam = rows.filter((r) => r.family === f.name);
     const totalPoints = fam.reduce((s, r) => s + r.points, 0);
+    // Compare families on a per-member basis so a bigger household is not
+    // automatically "ahead" just for having more brackets.
+    const avgPoints = fam.length ? Math.round((totalPoints / fam.length) * 10) / 10 : 0;
     const accuracy =
       attainable > 0 && fam.length
         ? Math.min(100, Math.round((totalPoints / (attainable * fam.length)) * 100))
@@ -144,11 +153,12 @@ export default async function StatsPage() {
       name: f.name,
       count: fam.length,
       totalPoints,
+      avgPoints,
       accuracy,
       isMe: f.name === myFamily,
       members: fam.map(toMember),
     };
-  }).sort((a, b) => (b.accuracy ?? -1) - (a.accuracy ?? -1) || b.totalPoints - a.totalPoints);
+  }).sort((a, b) => (b.accuracy ?? -1) - (a.accuracy ?? -1) || b.avgPoints - a.avgPoints);
 
   const h2hTop = rows
     .slice()
