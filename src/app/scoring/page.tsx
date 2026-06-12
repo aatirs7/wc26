@@ -121,7 +121,9 @@ export default function ScoringPage() {
           On the <span className="text-foreground">Predict</span> page you can call the exact
           scoreline of upcoming matches. Nail it and you bank{' '}
           <span className="text-foreground">{PREDICT_EXACT_POINTS} bonus points</span>; anything else
-          scores nothing. Predictions open 24h before kickoff and lock when the match starts.
+          scores nothing. Predictions open 24h before kickoff and lock when the match starts. The
+          point scores <span className="text-foreground">live</span> the moment the running score
+          matches your call and locks at full time, so it can come and go as the scoreline moves.
         </p>
         <p className="text-sm leading-relaxed text-muted">
           Bonus points add straight into your combined total on the standings, so a hot prediction
