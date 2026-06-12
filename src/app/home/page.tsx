@@ -8,7 +8,6 @@ import {
   BarChart3,
   Target,
   MessageCircle,
-  Lock,
   Timer,
   ArrowRight,
   Radio,
@@ -286,31 +285,19 @@ export default async function HomePage({
 
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
       <div className="space-y-6">
-      {/* Kickoff / lock banner */}
-      <section
-        className="reveal card space-y-3 p-4 text-center"
-        style={{ animationDelay: '60ms' }}
-      >
-        {locked ? (
-          <div className="inline-flex items-center justify-center gap-2 text-live">
-            <Lock className="h-4 w-4" />
-            <span className="text-sm font-semibold">The tournament is live</span>
+      {/* Pre-kickoff countdown (hidden once the tournament is live) */}
+      {!locked ? (
+        <section className="reveal card space-y-3 p-4 text-center" style={{ animationDelay: '60ms' }}>
+          <div className="inline-flex items-center justify-center gap-2 text-gold">
+            <Timer className="h-4 w-4" />
+            <span className="text-[0.7rem] font-bold uppercase tracking-[0.2em]">Brackets lock in</span>
           </div>
-        ) : (
-          <>
-            <div className="inline-flex items-center justify-center gap-2 text-gold">
-              <Timer className="h-4 w-4" />
-              <span className="text-[0.7rem] font-bold uppercase tracking-[0.2em]">
-                Brackets lock in
-              </span>
-            </div>
-            <Countdown kickoffMs={kickoff.getTime()} />
-            <p className="text-xs text-muted">
-              Kickoff {matchDayLabel(kickoff)}, {matchTime(kickoff)} {DISPLAY_TZ_LABEL}
-            </p>
-          </>
-        )}
-      </section>
+          <Countdown kickoffMs={kickoff.getTime()} />
+          <p className="text-xs text-muted">
+            Kickoff {matchDayLabel(kickoff)}, {matchTime(kickoff)} {DISPLAY_TZ_LABEL}
+          </p>
+        </section>
+      ) : null}
 
       {/* Match Day live hub */}
       <Link
@@ -371,29 +358,8 @@ export default async function HomePage({
       </div>
 
       <div className="space-y-6">
-      {/* Bracket status headline */}
-      <section className="reveal" style={{ animationDelay: '180ms' }}>
-        <Link
-          href="/bracket"
-          className="card flex items-center gap-3 p-4 active:scale-[0.99] lg:transition-all lg:hover:-translate-y-0.5 lg:hover:border-edge-strong"
-        >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/10 ring-1 ring-accent/30">
-            <Trophy className="h-5 w-5 text-accent" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-bold">
-              {myBracket?.name ?? 'Your bracket'}
-            </div>
-          </div>
-          <span className="flex items-center gap-1 text-sm font-bold text-accent">
-            {cta}
-            <ArrowRight className="h-4 w-4" />
-          </span>
-        </Link>
-      </section>
-
       {/* Headline activities */}
-      <section className="reveal grid grid-cols-2 gap-3" style={{ animationDelay: '220ms' }}>
+      <section className="reveal grid grid-cols-2 gap-3" style={{ animationDelay: '160ms' }}>
         {FEATURES.map((f) => {
           const Icon = f.icon;
           const gold = f.tone === 'gold';
@@ -423,6 +389,27 @@ export default async function HomePage({
             </Link>
           );
         })}
+      </section>
+
+      {/* Bracket status headline */}
+      <section className="reveal" style={{ animationDelay: '180ms' }}>
+        <Link
+          href="/bracket"
+          className="card flex items-center gap-3 p-4 active:scale-[0.99] lg:transition-all lg:hover:-translate-y-0.5 lg:hover:border-edge-strong"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/10 ring-1 ring-accent/30">
+            <Trophy className="h-5 w-5 text-accent" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-bold">
+              {myBracket?.name ?? 'Your bracket'}
+            </div>
+          </div>
+          <span className="flex items-center gap-1 text-sm font-bold text-accent">
+            {cta}
+            <ArrowRight className="h-4 w-4" />
+          </span>
+        </Link>
       </section>
 
       {/* Quick jumps */}
