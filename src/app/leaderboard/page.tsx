@@ -225,12 +225,12 @@ export default async function LeaderboardPage({
       </p>
       <header className="pt-2 text-center">
         <h1 className="font-display text-4xl leading-none">Standings</h1>
-        <p className="mt-1 text-xs text-muted">
-          Bracket + score-prediction bonus ·{' '}
-          <Link href="/scoring" className="font-semibold text-accent underline">
-            How it&apos;s scored
-          </Link>
-        </p>
+        <Link
+          href="/scoring"
+          className="mt-1 inline-block text-[0.65rem] font-semibold text-accent underline"
+        >
+          How it&apos;s scored
+        </Link>
       </header>
 
       {me ? (
