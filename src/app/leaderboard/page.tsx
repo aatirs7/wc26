@@ -239,10 +239,6 @@ export default async function LeaderboardPage({
           <div className="font-display text-3xl leading-none">
             {ordinal(me.rank)} <span className="text-muted">of {rows.length}</span>
           </div>
-          <div className="font-display text-2xl leading-none text-accent">
-            {me.combined}{' '}
-            <span className="text-[0.6rem] font-bold uppercase tracking-wider text-muted">pts</span>
-          </div>
         </div>
       ) : null}
 
