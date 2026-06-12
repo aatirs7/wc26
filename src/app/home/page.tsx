@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { eq, inArray } from 'drizzle-orm';
+import { count, eq, inArray } from 'drizzle-orm';
 import {
   Trophy,
   ListOrdered,
@@ -14,7 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { db } from '@/lib/db';
-import { brackets, bracketScores, groupStandings, matchPredictions, matches, poolMembers, pools, standingSnapshots, users } from '@/lib/schema';
+import { brackets, bracketScores, groupStandings, matchPredictions, matches, messages, poolMembers, pools, standingSnapshots, users } from '@/lib/schema';
 import { currentUserId } from '@/lib/auth';
 import { buildFacts, provisionalPoints } from '@/lib/scoring';
 import { isLocked, kickoffUtc } from '@/lib/lock';
@@ -22,6 +22,7 @@ import { isComplete } from '@/lib/predictions';
 import { DISPLAY_TZ_LABEL, matchDayLabel, matchTime } from '@/lib/format-time';
 import Countdown from '@/components/home/Countdown';
 import DailyRecap, { type RecapData } from '@/components/home/DailyRecap';
+import ChatBadge from '@/components/chat/ChatBadge';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,6 +73,13 @@ export default async function HomePage({
     memberships.find((m) => m.poolId === requested) ??
     memberships.find((m) => m.poolId === process.env.NEXT_PUBLIC_DEFAULT_POOL_ID) ??
     memberships[0];
+
+  // Total smack-talk messages in the active pool, for the unread badge on the
+  // Trash talk button (the client compares it to the last count it saw).
+  const chatCount = active
+    ? (await db.select({ c: count() }).from(messages).where(eq(messages.poolId, active.poolId)))[0]
+        ?.c ?? 0
+    : 0;
 
   // Compute the player's rank within the active pool, mirroring the
   // leaderboard's ordering (submitted first, then points, then tiebreak).
@@ -367,12 +375,15 @@ export default async function HomePage({
             <Link
               key={f.href}
               href={f.href}
-              className={`card ${gold ? 'shine-sweep' : 'shine-sweep-2'} flex flex-col items-center gap-2 p-4 text-center shadow-lg active:scale-[0.98] lg:transition-transform lg:hover:-translate-y-0.5 ${
+              className={`card relative ${gold ? 'shine-sweep' : 'shine-sweep-2'} flex flex-col items-center gap-2 p-4 text-center shadow-lg active:scale-[0.98] lg:transition-transform lg:hover:-translate-y-0.5 ${
                 gold
                   ? 'border-gold/50 bg-gold/[0.14] shadow-gold/20'
                   : 'border-accent/50 bg-accent/[0.14] shadow-accent/20'
               }`}
             >
+              {f.href === '/chat' ? (
+                <ChatBadge poolId={active?.poolId ?? ''} count={chatCount} />
+              ) : null}
               <span
                 className={`flex h-11 w-11 items-center justify-center rounded-xl ring-1 ${
                   gold ? 'bg-gold/20 ring-gold/40' : 'bg-accent/20 ring-accent/40'
