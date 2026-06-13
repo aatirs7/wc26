@@ -361,8 +361,6 @@ export default async function HomePage({
         </div>
       </section>
 
-      {/* Daily recap (self-hides until there is movement) */}
-      <DailyRecap data={recap} />
       </div>
 
       <div className="space-y-6">
@@ -401,6 +399,9 @@ export default async function HomePage({
           );
         })}
       </section>
+
+      {/* Daily recap (self-hides until there is movement) */}
+      <DailyRecap data={recap} />
 
       {/* Bracket status headline */}
       <section className="reveal" style={{ animationDelay: '180ms' }}>
