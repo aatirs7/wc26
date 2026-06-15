@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { count, eq, inArray } from 'drizzle-orm';
+import { and, count, eq, gt, inArray, lte } from 'drizzle-orm';
 import {
   Trophy,
   ListOrdered,
@@ -19,6 +19,7 @@ import { currentUserId } from '@/lib/auth';
 import { buildFacts, provisionalPoints } from '@/lib/scoring';
 import { isLocked, kickoffUtc } from '@/lib/lock';
 import { isComplete } from '@/lib/predictions';
+import { PREDICT_OPEN_MS } from '@/lib/predict';
 import { DISPLAY_TZ_LABEL, matchDayLabel, matchTime } from '@/lib/format-time';
 import Countdown from '@/components/home/Countdown';
 import DailyRecap, { type RecapData } from '@/components/home/DailyRecap';
@@ -80,6 +81,33 @@ export default async function HomePage({
     ? (await db.select({ c: count() }).from(messages).where(eq(messages.poolId, active.poolId)))[0]
         ?.c ?? 0
     : 0;
+
+  // Open score predictions the player has not made yet (match kicks off within
+  // the prediction window and has not started). Drives the reminder banner and
+  // the count badge on the Score predict button, since people keep forgetting.
+  // eslint-disable-next-line react-hooks/purity
+  const nowMs = Date.now();
+  let predictCount = 0;
+  if (userId) {
+    const openMatches = await db
+      .select({ id: matches.id })
+      .from(matches)
+      .where(
+        and(
+          eq(matches.status, 'scheduled'),
+          gt(matches.kickoffUtc, new Date(nowMs)),
+          lte(matches.kickoffUtc, new Date(nowMs + PREDICT_OPEN_MS)),
+        ),
+      );
+    if (openMatches.length > 0) {
+      const made = await db
+        .select({ matchId: matchPredictions.matchId })
+        .from(matchPredictions)
+        .where(eq(matchPredictions.userId, userId));
+      const done = new Set(made.map((p) => p.matchId));
+      predictCount = openMatches.filter((m) => !done.has(m.id)).length;
+    }
+  }
 
   // Compute the player's rank within the active pool, mirroring the
   // leaderboard's ordering (submitted first, then points, then tiebreak).
@@ -291,6 +319,18 @@ export default async function HomePage({
         </div>
       </header>
 
+      {predictCount > 0 ? (
+        <Link
+          href="/predict"
+          className="reveal flex items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent/[0.1] px-3 py-2.5 text-center shadow-sm active:scale-[0.99]"
+        >
+          <Target className="h-4 w-4 shrink-0 text-accent" strokeWidth={2.4} />
+          <span className="text-sm font-semibold text-accent">
+            Don&apos;t forget: {predictCount} {predictCount === 1 ? 'match' : 'matches'} to predict before kickoff
+          </span>
+        </Link>
+      ) : null}
+
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
       <div className="space-y-6">
       {/* Pre-kickoff countdown (hidden once the tournament is live) */}
@@ -381,6 +421,11 @@ export default async function HomePage({
             >
               {f.href === '/chat' ? (
                 <ChatBadge poolId={active?.poolId ?? ''} count={chatCount} />
+              ) : null}
+              {f.href === '/predict' && predictCount > 0 ? (
+                <span className="absolute right-2 top-2 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-live px-1 text-[0.6rem] font-bold leading-none text-white shadow-sm">
+                  {predictCount > 99 ? '99+' : predictCount}
+                </span>
               ) : null}
               <span
                 className={`flex h-11 w-11 items-center justify-center rounded-xl ring-1 ${
