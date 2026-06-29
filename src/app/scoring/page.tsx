@@ -1,5 +1,5 @@
 import { SCORING } from '@/lib/constants';
-import { PREDICT_EXACT_POINTS } from '@/lib/predict';
+import { PREDICT_EXACT_POINTS, PREDICT_PENS_POINTS } from '@/lib/predict';
 
 export const dynamic = 'force-static';
 
@@ -132,6 +132,13 @@ export default function ScoringPage() {
           scores nothing. Predictions open 24h before kickoff and lock when the match starts. The
           point scores <span className="text-foreground">live</span> the moment the running score
           matches your call and locks at full time, so it can come and go as the scoreline moves.
+        </p>
+        <p className="text-sm leading-relaxed text-muted">
+          <span className="text-foreground">Knockout shootouts:</span> when you call a knockout match
+          level, you also pick who wins on penalties. If the tie really is decided on penalties and
+          you called the right team, that is{' '}
+          <span className="text-foreground">{PREDICT_PENS_POINTS} more bonus point</span> on top of
+          the exact score.
         </p>
         <p className="text-sm leading-relaxed text-muted">
           Bonus points add straight into your combined total on the standings, so a hot prediction

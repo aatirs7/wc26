@@ -1,0 +1,1 @@
+ALTER TABLE "match_predictions" ADD COLUMN "pens_winner" text;
