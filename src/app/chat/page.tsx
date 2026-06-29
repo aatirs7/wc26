@@ -7,6 +7,7 @@ import { currentUserId } from '@/lib/auth';
 import { matchTime } from '@/lib/format-time';
 import ChatBox from '@/components/chat/ChatBox';
 import ChatSeen from '@/components/chat/ChatSeen';
+import ScrollToEnd from '@/components/chat/ScrollToEnd';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +57,7 @@ export default async function ChatPage({
   return (
     <div className="flex min-h-[calc(100vh-9rem)] flex-col pb-36 pt-4 lg:mx-auto lg:max-w-2xl">
       <ChatSeen poolId={active.poolId} count={chatCount} />
+      <ScrollToEnd poolId={active.poolId} />
       <header className="pt-2 text-center">
         <h1 className="font-display text-4xl leading-none">Smack talk</h1>
         <p className="mt-1 text-xs text-muted">Keep it classy. Mostly.</p>
