@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, AlertTriangle } from 'lucide-react';
 
 // One-time, dismissible reminder shown to every Siddiqui member. It only starts
 // appearing at `activeAt` (the moment Aafi's suspension is lifted) and is
@@ -72,20 +72,33 @@ export default function RedCardReminder({
         <div
           className="mx-auto h-16 w-12 rounded-md"
           style={{ backgroundColor: '#dc2626', boxShadow: '0 8px 20px rgba(220,38,38,0.45)' }}
+          aria-hidden
         />
 
-        <p className="mt-4 text-[0.65rem] font-bold uppercase tracking-[0.25em] text-muted-2">
-          Fair play
-        </p>
-        <h2 className="mt-1 font-display text-2xl leading-tight text-foreground">
-          Don&apos;t sign in as someone else
+        {/* Warning banner, so it clearly reads as a caution and not a verdict. */}
+        <div
+          className="mx-auto mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1"
+          style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245,158,11,0.45)' }}
+        >
+          <AlertTriangle className="h-3.5 w-3.5" strokeWidth={2.5} style={{ color: '#f59e0b' }} />
+          <span
+            className="text-[0.65rem] font-bold uppercase tracking-[0.2em]"
+            style={{ color: '#f59e0b' }}
+          >
+            This is a warning
+          </span>
+        </div>
+
+        <h2 className="mt-3 font-display text-2xl leading-tight text-foreground">
+          Play as yourself, only
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          Reminder: play as yourself only. Cheating or signing in as another person will get you a{' '}
+          A heads-up for everyone, no one has been carded. But signing in as someone else or cheating
+          is a straight{' '}
           <span className="font-bold" style={{ color: '#ef4444' }}>
             red card
-          </span>
-          .
+          </span>{' '}
+          and gets you suspended.
         </p>
         <p className="mt-2 font-display text-xl" style={{ color: '#ef4444' }}>
           #suspended
