@@ -18,3 +18,13 @@ export function isDisqualified(
   if (now.getTime() >= DISQUALIFIED_UNTIL.getTime()) return false;
   return DISQUALIFIED_NAMES.includes(displayName.trim().toLowerCase());
 }
+
+// Preview override: listed players see the pool-wide red-card reminder popup
+// immediately (ignoring the reinstatement gate and the once-only flag), so it
+// can be checked before it goes live for everyone. Empty this to stop previewing.
+export const REDCARD_PREVIEW_NAMES: string[] = ['aatir'];
+
+export function isRedCardPreview(displayName: string | null | undefined): boolean {
+  if (!displayName) return false;
+  return REDCARD_PREVIEW_NAMES.includes(displayName.trim().toLowerCase());
+}

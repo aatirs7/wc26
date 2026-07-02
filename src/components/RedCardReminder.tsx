@@ -9,10 +9,22 @@ import { X } from 'lucide-react';
 const VERSION = '2026-07-02-redcard';
 const KEY = 'wc26_redcard_seen';
 
-export default function RedCardReminder({ activeAt }: { activeAt: number }) {
+export default function RedCardReminder({
+  activeAt,
+  force = false,
+}: {
+  activeAt: number;
+  force?: boolean;
+}) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    // Preview mode: show it now, ignoring the reinstatement gate and the
+    // once-only flag.
+    if (force) {
+      const t = setTimeout(() => setOpen(true), 500);
+      return () => clearTimeout(t);
+    }
     // Not live until the reinstatement moment has passed.
     if (Date.now() < activeAt) return;
     let seen: string | null = null;
@@ -25,7 +37,7 @@ export default function RedCardReminder({ activeAt }: { activeAt: number }) {
       const t = setTimeout(() => setOpen(true), 500);
       return () => clearTimeout(t);
     }
-  }, [activeAt]);
+  }, [activeAt, force]);
 
   function close() {
     setOpen(false);

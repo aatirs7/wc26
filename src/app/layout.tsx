@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { syncMeta, users } from '@/lib/schema';
 import { currentUserId } from '@/lib/auth';
-import { isDisqualified, DISQUALIFIED_UNTIL } from '@/lib/disqualified';
+import { isDisqualified, isRedCardPreview, DISQUALIFIED_UNTIL } from '@/lib/disqualified';
 import BottomTabBar from '@/components/nav/BottomTabBar';
 import DesktopNav from '@/components/nav/DesktopNav';
 import ThemeButton from '@/components/theme/ThemeButton';
@@ -63,6 +63,8 @@ export default async function RootLayout({
   let updateGain: number | null = null;
   // Reversible disqualification prank: a listed player sees a blocking overlay.
   let disqualified = false;
+  // Preview override: listed players see the red-card reminder immediately.
+  let redCardPreview = false;
   if (signedIn) {
     try {
       const uid = await currentUserId();
@@ -73,6 +75,7 @@ export default async function RootLayout({
           .where(eq(users.id, uid))
           .limit(1);
         disqualified = isDisqualified(me?.displayName);
+        redCardPreview = isRedCardPreview(me?.displayName);
         const [row] = await db
           .select({ value: syncMeta.value })
           .from(syncMeta)
@@ -106,7 +109,9 @@ export default async function RootLayout({
           {children}
         </main>
         <BottomTabBar />
-        {signedIn ? <RedCardReminder activeAt={DISQUALIFIED_UNTIL.getTime()} /> : null}
+        {signedIn ? (
+          <RedCardReminder activeAt={DISQUALIFIED_UNTIL.getTime()} force={redCardPreview} />
+        ) : null}
         {disqualified ? <DisqualifiedGate until={DISQUALIFIED_UNTIL.getTime()} /> : null}
       </body>
     </html>
