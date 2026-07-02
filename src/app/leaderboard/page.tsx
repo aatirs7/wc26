@@ -15,6 +15,8 @@ import {
   users,
 } from '@/lib/schema';
 import { currentUserId } from '@/lib/auth';
+import { isTournamentOver, isFinalePreview } from '@/lib/finale';
+import { ROOT_ID } from '@/lib/knockout-bracket';
 import { buildFacts, provisionalPoints } from '@/lib/scoring';
 import { pointsBreakdown } from '@/lib/points-breakdown';
 import { computeLiveGroupTables } from '@/lib/standings';
@@ -76,6 +78,7 @@ export default async function LeaderboardPage({
   // player's points (group points that update as live tables move).
   const matchRows = await db
     .select({
+      id: matches.id,
       stage: matches.stage,
       status: matches.status,
       groupLetter: matches.groupLetter,
@@ -219,6 +222,11 @@ export default async function LeaderboardPage({
   };
   const me = rows.find((r) => r.ownerId === userId);
 
+  // Entry point to the end-of-tournament finale, once it is live (or preview).
+  const myName = members.find((m) => m.userId === userId)?.displayName;
+  const finaleReady =
+    isTournamentOver(matchRows.find((m) => m.id === ROOT_ID)?.status) || isFinalePreview(myName);
+
   return (
     <div className="space-y-4 py-4 lg:mx-auto lg:max-w-2xl">
       <PullToRefresh />
@@ -234,6 +242,18 @@ export default async function LeaderboardPage({
           How it&apos;s scored
         </Link>
       </header>
+
+      {finaleReady ? (
+        <Link
+          href="/results"
+          className="block rounded-xl border border-gold/40 bg-gold/[0.08] px-4 py-3 text-center active:scale-[0.99]"
+        >
+          <span className="font-display text-lg text-gold">🏆 The finale is here</span>
+          <span className="mt-0.5 block text-xs text-muted">
+            See the podium, awards and your tournament recap →
+          </span>
+        </Link>
+      ) : null}
 
       {me ? (
         <div className="card flex flex-col items-center gap-1 px-4 py-3 text-center">

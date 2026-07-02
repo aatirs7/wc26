@@ -3,9 +3,11 @@ import { Bebas_Neue, Hanken_Grotesk } from 'next/font/google';
 import { cookies } from 'next/headers';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { syncMeta, users } from '@/lib/schema';
+import { matches, syncMeta, users } from '@/lib/schema';
 import { currentUserId } from '@/lib/auth';
 import { isDisqualified, isRedCardPreview, DISQUALIFIED_UNTIL } from '@/lib/disqualified';
+import { isTournamentOver, isFinalePreview } from '@/lib/finale';
+import { ROOT_ID } from '@/lib/knockout-bracket';
 import BottomTabBar from '@/components/nav/BottomTabBar';
 import DesktopNav from '@/components/nav/DesktopNav';
 import ThemeButton from '@/components/theme/ThemeButton';
@@ -14,6 +16,7 @@ import InstallPrompt from '@/components/InstallPrompt';
 import AutoRefresh from '@/components/AutoRefresh';
 import DisqualifiedGate from '@/components/DisqualifiedGate';
 import RedCardReminder from '@/components/RedCardReminder';
+import FinaleTakeover from '@/components/results/FinaleTakeover';
 import './globals.css';
 
 const display = Bebas_Neue({
@@ -65,6 +68,9 @@ export default async function RootLayout({
   let disqualified = false;
   // Preview override: listed players see the red-card reminder immediately.
   let redCardPreview = false;
+  // The end-of-tournament finale (podium/awards) splash, live once the final
+  // ends or for preview players testing it early.
+  let finaleActive = false;
   if (signedIn) {
     try {
       const uid = await currentUserId();
@@ -76,6 +82,12 @@ export default async function RootLayout({
           .limit(1);
         disqualified = isDisqualified(me?.displayName);
         redCardPreview = isRedCardPreview(me?.displayName);
+        const [finalMatch] = await db
+          .select({ status: matches.status })
+          .from(matches)
+          .where(eq(matches.id, ROOT_ID))
+          .limit(1);
+        finaleActive = isTournamentOver(finalMatch?.status) || isFinalePreview(me?.displayName);
         const [row] = await db
           .select({ value: syncMeta.value })
           .from(syncMeta)
@@ -112,6 +124,7 @@ export default async function RootLayout({
         {signedIn ? (
           <RedCardReminder activeAt={DISQUALIFIED_UNTIL.getTime()} force={redCardPreview} />
         ) : null}
+        {signedIn && finaleActive ? <FinaleTakeover /> : null}
         {disqualified ? <DisqualifiedGate until={DISQUALIFIED_UNTIL.getTime()} /> : null}
       </body>
     </html>
