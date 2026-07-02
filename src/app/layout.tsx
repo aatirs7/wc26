@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { syncMeta, users } from '@/lib/schema';
 import { currentUserId } from '@/lib/auth';
-import { isDisqualified } from '@/lib/disqualified';
+import { isDisqualified, DISQUALIFIED_UNTIL } from '@/lib/disqualified';
 import BottomTabBar from '@/components/nav/BottomTabBar';
 import DesktopNav from '@/components/nav/DesktopNav';
 import ThemeButton from '@/components/theme/ThemeButton';
@@ -13,6 +13,7 @@ import WhatsNew from '@/components/WhatsNew';
 import InstallPrompt from '@/components/InstallPrompt';
 import AutoRefresh from '@/components/AutoRefresh';
 import DisqualifiedGate from '@/components/DisqualifiedGate';
+import RedCardReminder from '@/components/RedCardReminder';
 import './globals.css';
 
 const display = Bebas_Neue({
@@ -105,7 +106,8 @@ export default async function RootLayout({
           {children}
         </main>
         <BottomTabBar />
-        {disqualified ? <DisqualifiedGate /> : null}
+        {signedIn ? <RedCardReminder activeAt={DISQUALIFIED_UNTIL.getTime()} /> : null}
+        {disqualified ? <DisqualifiedGate until={DISQUALIFIED_UNTIL.getTime()} /> : null}
       </body>
     </html>
   );
