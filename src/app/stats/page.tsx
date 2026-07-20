@@ -149,6 +149,12 @@ export default async function StatsPage() {
       attainable > 0 && fam.length
         ? Math.min(100, Math.round((totalPoints / (attainable * fam.length)) * 100))
         : null;
+    // The household's own top scorer, for the house champions board. Ties go
+    // to whoever comes first alphabetically so the pick is stable between
+    // renders rather than depending on row order.
+    const bestRow = fam
+      .slice()
+      .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name))[0];
     return {
       name: f.name,
       count: fam.length,
@@ -157,8 +163,15 @@ export default async function StatsPage() {
       accuracy,
       isMe: f.name === myFamily,
       members: fam.map(toMember),
+      best: bestRow ? { ...toMember(bestRow), isMe: bestRow.name === myName } : null,
     };
   }).sort((a, b) => (b.accuracy ?? -1) - (a.accuracy ?? -1) || b.avgPoints - a.avgPoints);
+
+  // House champions, ranked against each other rather than by household.
+  const houseChampions = families
+    .filter((f): f is typeof f & { best: NonNullable<typeof f.best> } => f.best !== null)
+    .map((f) => ({ family: f.name, ...f.best }))
+    .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
 
   const h2hTop = rows
     .slice()
@@ -275,6 +288,7 @@ export default async function StatsPage() {
             banner={banner}
             cohorts={cohorts}
             families={families}
+            houseChampions={houseChampions}
             top={h2hTop}
             anyPoints={anyPoints}
             myName={myName}

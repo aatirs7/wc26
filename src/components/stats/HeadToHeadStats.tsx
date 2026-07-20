@@ -26,6 +26,14 @@ export interface FamilyView {
   accuracy: number | null;
   isMe: boolean;
   members: Member[];
+  // The household's own highest scorer.
+  best: (Member & { isMe: boolean }) | null;
+}
+
+// One per household, ranked against each other.
+export interface HouseChampion extends Member {
+  family: string;
+  isMe: boolean;
 }
 
 export interface TopRow {
@@ -40,6 +48,7 @@ export default function HeadToHeadStats({
   banner,
   cohorts,
   families,
+  houseChampions,
   top,
   anyPoints,
   myName,
@@ -47,6 +56,7 @@ export default function HeadToHeadStats({
   banner: string;
   cohorts: CohortView[];
   families: FamilyView[];
+  houseChampions: HouseChampion[];
   top: TopRow[];
   anyPoints: boolean;
   myName: string | null;
@@ -124,6 +134,45 @@ export default function HeadToHeadStats({
         ))}
       </div>
 
+      {/* Best player in each household, ranked against the other households'
+          best. A small family can still produce the strongest single player,
+          which the accuracy-per-household table deliberately hides. */}
+      {houseChampions.length > 0 && anyPoints ? (
+        <section>
+          <h2 className="mb-1 text-center font-display text-2xl">House champions</h2>
+          <p className="mb-3 text-center text-xs text-muted">
+            The best player in each household, put up against each other.
+          </p>
+          <ol className="space-y-2">
+            {houseChampions.map((c, i) => (
+              <li
+                key={c.family}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${
+                  i < 3 ? `podium-${i + 1}` : `card ${c.isMe ? 'border-accent bg-accent/[0.06]' : ''}`
+                }`}
+              >
+                <span className="w-6 shrink-0 text-center text-xl leading-none">
+                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : ''}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold">
+                    {c.name}
+                    {c.isMe ? (
+                      <span className="ml-1.5 text-[0.6rem] font-bold uppercase text-accent">You</span>
+                    ) : null}
+                  </span>
+                  <span className="block truncate text-[0.7rem] text-muted">{c.family}</span>
+                </span>
+                {c.accuracy !== null ? (
+                  <span className="shrink-0 text-xs font-semibold text-muted">{c.accuracy}%</span>
+                ) : null}
+                <span className="shrink-0 font-display text-xl text-accent">{c.points}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
       <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0">
       <section>
         <h2 className="mb-2 text-center font-display text-2xl">Family vs Family</h2>
@@ -147,6 +196,11 @@ export default function HeadToHeadStats({
                   <div className="text-xs text-muted">
                     {f.count} {f.count === 1 ? 'player' : 'players'} · {f.avgPoints} avg pts
                   </div>
+                  {f.best && f.best.points > 0 ? (
+                    <div className="text-[0.7rem] font-semibold text-gold">
+                      👑 {f.best.name}, {f.best.points} pts
+                    </div>
+                  ) : null}
                 </div>
                 <div className="text-right">
                   <div className="font-display text-2xl leading-none text-accent">
