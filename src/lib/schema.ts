@@ -107,6 +107,15 @@ export const bracketScores = pgTable(
   (t) => [primaryKey({ columns: [t.bracketId, t.roundKey] })],
 );
 
+// End-of-tournament suggestions and reviews. Free text, one row per
+// submission, so somebody can send several thoughts as they have them.
+export const feedback = pgTable('feedback', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull(),
+  body: text('body').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Tiny key-value row for sync bookkeeping (last full sync time, etc).
 export const syncMeta = pgTable('sync_meta', {
   key: text('key').primaryKey(),
